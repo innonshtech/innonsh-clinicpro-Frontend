@@ -44,7 +44,7 @@
 //               <div className="h-8 w-8 bg-blue-600 rounded-md flex items-center justify-center">
 //                 <span className="text-white font-bold">H</span>
 //               </div>
-//               <span className="ml-2 text-xl font-bold text-blue-600">HealthByte</span>
+//               <span className="ml-2 text-xl font-bold text-blue-600">ClinicPro</span>
 //             </Link>
 //             <div className="hidden md:ml-6 md:flex md:space-x-8">
 //               <Link 
@@ -259,7 +259,7 @@ export default function Navbar() {
               <div className="h-8 w-8 bg-blue-600 rounded-md flex items-center justify-center">
                 <span className="text-white font-bold">H</span>
               </div>
-              <span className="ml-2 text-xl font-bold text-blue-600">HealthByte</span>
+              <span className="ml-2 text-xl font-bold text-blue-600">ClinicPro</span>
             </Link>
             <div className="hidden md:ml-6 md:flex md:space-x-8">
               <Link

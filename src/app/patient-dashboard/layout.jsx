@@ -393,12 +393,10 @@ export default function DashboardLayout({ children }) {
           <div className="flex h-16 items-center px-6 border-b border-slate-100 flex-shrink-0">
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                  <FiUser className="text-white w-5 h-5" />
-                </div>
+                <img src="/icons8-medical-bag-100.png" alt="ClinicPro" className="w-8 h-8 object-contain" />
                 <div>
                   <h1 className="text-xl font-bold text-slate-800">
-                    HealthByte
+                    ClinicPro
                   </h1>
                 </div>
               </div>

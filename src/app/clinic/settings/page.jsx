@@ -7,15 +7,15 @@ import { toast } from 'react-hot-toast';
 export default function ClinicSettings() {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    clinicName: 'HealthByte Clinic',
+    clinicName: 'ClinicPro Clinic',
     address: '123 Main Street, City, Country',
     city: 'Metropolis',
     state: 'California',
     postalCode: '12345',
     country: 'United States',
     phone: '+1 (987) 654-3210',
-    email: 'contact@healthbyte.com',
-    website: 'https://healthbyte.com',
+    email: 'contact@clinicpro.com',
+    website: 'https://clinicpro.com',
     registrationNumber: 'CL12345678',
     taxId: 'TAX987654',
     clinicType: 'general',

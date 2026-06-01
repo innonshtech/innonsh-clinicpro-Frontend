@@ -78,12 +78,10 @@ export default function ClinicLayout({ children }) {
       >
         <div className="flex h-16 items-center px-6 border-b border-slate-100 flex-shrink-0">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-white" />
-            </div>
+              <img src="/icons8-medical-bag-100.png" alt="ClinicPro" className="w-8 h-8 object-contain" />
             <div>
               <h1 className="text-xl font-bold text-slate-800">
-                HealthByte
+                ClinicPro
               </h1>
             </div>
           </div>
@@ -124,8 +122,8 @@ export default function ClinicLayout({ children }) {
         >
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-3">
-              <Building2 className="w-6 h-6 text-blue-600" />
-              <h1 className="text-xl font-bold text-blue-600">HealthByte</h1>
+              <img src="/icons8-medical-bag-100.png" alt="ClinicPro" className="w-6 h-6 object-contain" />
+              <h1 className="text-xl font-bold text-blue-600">ClinicPro</h1>
             </div>
             <button
               onClick={() => setSidebarOpen(false)}

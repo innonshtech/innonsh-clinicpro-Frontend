@@ -3,7 +3,7 @@ import Link from 'next/link';
 export default function Footer() {
   const footerLinks = [
     {
-      title: "HealthByte",
+      title: "ClinicPro",
       links: ["About", "Blog", "Careers", "Press", "Contact Us"]
     },
     {
@@ -12,7 +12,7 @@ export default function Footer() {
     },
     {
       title: "For Doctors",
-      links: ["HealthByte Profile", "For Clinics", "Ray by HealthByte", "HealthByte Reach", "Health Feed"]
+      links: ["ClinicPro Profile", "For Clinics", "Ray by ClinicPro", "ClinicPro Reach", "Health Feed"]
     },
     {
       title: "More",
@@ -39,7 +39,7 @@ export default function Footer() {
         ))}
       </div>
       <div className="max-w-7xl mx-auto mt-8 pt-8 border-t border-gray-800 text-center text-gray-400">
-        <p>© 2025 HealthByte. All rights reserved.</p>
+        <p>© 2025 ClinicPro. All rights reserved.</p>
       </div>
     </footer>
   );

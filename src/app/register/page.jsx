@@ -2121,7 +2121,7 @@ const handleDoctorInputChange = (field, value) => {
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">Register Your Clinic</h1>
           <p className="text-xl text-gray-500/90 dark:text-gray-400 max-w-2xl mx-auto">
-            Register Your Clinic to Start Using DOC ERP
+            Register Your Clinic to Start Using ClinicPro
           </p>
         </div>
 

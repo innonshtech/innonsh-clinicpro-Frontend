@@ -894,7 +894,7 @@ p  { color: var(--ink-60); line-height: 1.65; }
   <div className="wrap">
     <div className="nav-row">
       <a href="#!" onClick={(e) => e.preventDefault()} className="nav-logo">
-        <div className="nav-icon">I</div>
+        <img src="/icons8-medical-bag-100.png" alt="ClinicPro Icon" className="nav-icon-img" style={{width:'36px',height:'36px',objectFit:'contain',borderRadius:'10px'}} />
         Innonsh ClinicPro
       </a>
       <ul className="nav-menu">
@@ -943,7 +943,7 @@ p  { color: var(--ink-60); line-height: 1.65; }
       <div className="mockup">
         <div className="mk-bar">
           <div className="mk-dots"><span></span><span></span><span></span></div>
-          <div className="mk-url">docerp.io/dashboard</div>
+          <div className="mk-url">clinicpro.io/dashboard</div>
         </div>
         <div className="mk-body">
           <div className="mk-stats">

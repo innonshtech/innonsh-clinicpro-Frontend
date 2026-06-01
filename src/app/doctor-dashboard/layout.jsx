@@ -60,11 +60,9 @@ export default function ClinicDashboardLayout({ children }) {
       }`}>
         <div className="flex h-16 items-center px-6 border-b border-slate-100 flex-shrink-0">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Stethoscope className="w-5 h-5 text-white" />
-            </div>
+              <img src="/icons8-medical-bag-100.png" alt="ClinicPro" className="w-8 h-8 object-contain" />
             <div>
-              <h1 className="text-xl font-bold text-slate-800">HealthByte</h1>
+              <h1 className="text-xl font-bold text-slate-800">ClinicPro</h1>
             </div>
           </div>
         </div>

@@ -23,7 +23,7 @@ export default function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter();
-  const [userdata, setuserdata] = useState({ name: 'Admin User', email: 'admin@healthbyte.com' });
+  const [userdata, setuserdata] = useState({ name: 'Admin User', email: 'admin@clinicpro.com' });
 
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: Home },
@@ -73,12 +73,10 @@ export default function DashboardLayout({ children }) {
         <div className="flex h-full flex-col">
           <div className="flex h-16 items-center px-6 border-b border-slate-100">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <Sparkles className="h-6 w-6 text-white" />
-              </div>
+              <img src="/icons8-medical-bag-100.png" alt="ClinicPro" className="w-8 h-8 object-contain" />
               <div>
                 <h1 className="text-xl font-bold text-slate-800">
-                  HealthByte
+                  ClinicPro
                 </h1>
               </div>
             </div>

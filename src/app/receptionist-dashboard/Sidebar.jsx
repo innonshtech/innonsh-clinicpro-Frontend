@@ -75,12 +75,10 @@ export default function Sidebar({ isOpen, onClose }) {
       `}>
         <div className="flex items-center px-6 h-16 border-b border-slate-100">
           <Link href="/receptionist-dashboard" className="flex items-center hover:opacity-80 transition-opacity">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Users className="w-5 h-5 text-white" />
-            </div>
+              <img src="/icons8-medical-bag-100.png" alt="ClinicPro" className="w-8 h-8 object-contain" />
             <div className="ml-3 min-w-0">
               <h1 className="text-xl font-bold text-slate-800 truncate">
-                HealthByte
+                ClinicPro
               </h1>
             </div>
           </Link>

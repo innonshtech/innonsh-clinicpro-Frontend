@@ -19,7 +19,7 @@ export default function Sidebar() {
   return (
     <aside className="h-screen w-64 bg-white shadow-lg px-4 py-6 flex flex-col justify-between">
       <div>
-        <h1 className="text-2xl font-bold text-purple-600 mb-8">HealthByte</h1>
+        <h1 className="text-2xl font-bold text-purple-600 mb-8">ClinicPro</h1>
         <nav className="space-y-3">
           {menuItems.map((item) => {
             const Icon = item.icon;
