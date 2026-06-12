@@ -31,3 +31,8 @@ jobs:
       env:
         # Dummy variable
         NEXT_PUBLIC_API_URL: "http://localhost:3001"
+        MONGODB_URI: "mongodb://127.0.0.1:27017/test"
+        NEXT_PUBLIC_API_BASE_URL: "http://localhost:3001"
+        CLOUDINARY_CLOUD_NAME: "dummy_cloud"
+        CLOUDINARY_API_KEY: "dummy_key"
+        CLOUDINARY_API_SECRET: "dummy_secret"
