@@ -32,7 +32,7 @@ export default function DoctorStatusRoster() {
         setDoctors(allDoctors);
       }
     } catch (err) {
-      console.error("Doctor Roster Fetch Error:", err);
+      // console.error("Doctor Roster Fetch Error:", err);
     } finally {
       setLoading(false);
     }
@@ -105,7 +105,7 @@ export default function DoctorStatusRoster() {
                   <div className="flex items-center gap-4">
                     <div className="relative">
                       <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-lg overflow-hidden">
-                        {doc.profileImage ? (
+                        {doc.profileImage && !doc.profileImage.includes('placeholder.com') ? (
                           <img src={doc.profileImage} alt={doc.firstName} className="w-full h-full object-cover" />
                         ) : (
                           doc.firstName?.charAt(0)

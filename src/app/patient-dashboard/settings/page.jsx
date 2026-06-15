@@ -43,7 +43,10 @@ console.log("asdf",userId)
     if (!userId) return;
     
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/patient/fetch-by-id/${userId}`);
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE_URL}/api/v1/patient/fetch-by-id/${userId}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
       const data = await res.json();
       console.log("API Response:", data);
       

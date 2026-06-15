@@ -82,7 +82,10 @@ export default function DoctorsPage() {
 
   const fetchDoctors = async (id) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/clinic/fetch-doctor-clinicId/${id}`);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/api/v1/clinic/fetch-doctor-clinicId/${id}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
       const responseData = await response.json();
       
       if (responseData.success) {
@@ -147,8 +150,10 @@ export default function DoctorsPage() {
 
   const confirmDelete = async () => {
     try {
+      const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/api/v1/doctor/delete-by-id/${selectedDoctor.id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       const responseData = await response.json();
       if (responseData.success) {

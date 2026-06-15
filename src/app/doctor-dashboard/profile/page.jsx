@@ -20,7 +20,10 @@ export default function DoctorProfilePage() {
 
         if (!doctorId) return;
 
-        const res = await fetch(`${API_BASE_URL}/api/v1/doctor/fetch-by-id/${doctorId}`);
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${API_BASE_URL}/api/v1/doctor/fetch-by-id/${doctorId}`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
         const result = await res.json();
         if (result.success) {
           setDoctorData(result.data.doctor);

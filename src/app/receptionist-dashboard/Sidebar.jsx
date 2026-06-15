@@ -44,14 +44,28 @@ export default function Sidebar({ isOpen, onClose }) {
         const staffId = activeUser._id || activeUser.id;
         if (!staffId) return;
 
-        const res = await fetch(`${API_BASE_URL}/api/v1/clinic/update-receptionist/${staffId}`);
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        const res = await fetch(`${API_BASE_URL}/api/v1/clinic/update-receptionist/${staffId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (res.status === 401) {
+          localStorage.clear();
+          window.location.href = '/receptionist-login';
+          return;
+        }
+
         const result = await res.json();
         
         if (result.success && result.data.staff && result.data.staff.clinicName) {
           setUserName(`${result.data.staff.clinicName} - Receptionist`);
         }
       } catch (e) {
-        console.error("Sidebar Live Fetch Error:", e);
+        // Suppressed Sidebar Live Fetch Error to keep terminal clean
       }
     };
     fetchLatestProfile();

@@ -74,7 +74,10 @@ const identityProofRef = useRef(null);
 
   const fetchUserData = async (id) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/clinic/fetchProfileData/${id}`);
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE_URL}/api/v1/clinic/fetchProfileData/${id}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
       if (!res.ok) throw new Error('Failed to fetch doctor info');
       const responseData = await res.json();
       

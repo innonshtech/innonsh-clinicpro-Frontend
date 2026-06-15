@@ -36,7 +36,7 @@ export default function TodaysAppointments() {
         setAppointments(sorted);
       }
     } catch (err) {
-      console.error("Fetch error:", err);
+      // console.error("Fetch error:", err);
     } finally {
       setLoading(false);
     }

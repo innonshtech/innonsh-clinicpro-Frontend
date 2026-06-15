@@ -47,7 +47,7 @@ export default function FollowUpMonitor() {
         setFollowUps(filteredFollowUps);
       }
     } catch (err) {
-      console.error("Follow-up Fetch Error:", err);
+      // console.error("Follow-up Fetch Error:", err);
     } finally {
       setLoading(false);
     }
