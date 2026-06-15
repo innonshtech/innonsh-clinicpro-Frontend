@@ -42,7 +42,16 @@ export default function ClinicDashboard() {
           return
         }
 
-        const res = await axios.get(`${API_BASE_URL}/api/v1/clinic/dashboard/${clinicId}`)
+        const token = localStorage.getItem('token');
+        if (!token) {
+          throw new Error('No authentication token found');
+        }
+
+        const res = await axios.get(`${API_BASE_URL}/api/v1/clinic/dashboard/${clinicId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        })
         if (res.data.success) {
           setDashboardData(res.data.data)
         }

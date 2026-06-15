@@ -125,7 +125,10 @@ export default function PatientsPage() {
   useEffect(() => {
     const fetchPatients = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/v1/clinic/fetch-patients/${clinicId}`);
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${API_BASE_URL}/api/v1/clinic/fetch-patients/${clinicId}`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
         const responseData = await res.json();
         if (responseData.success) {
           setPatients(responseData.data.patients || []);

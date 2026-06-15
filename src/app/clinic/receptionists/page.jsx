@@ -50,7 +50,10 @@ const ReceptionistManagement = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/clinic/fetch-receptionist/${id}`);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/api/v1/clinic/fetch-receptionist/${id}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
       const responseData = await response.json();
 
       if (!responseData.success) {
@@ -114,8 +117,10 @@ const ReceptionistManagement = () => {
 
     setDeleteLoading(true);
     try {
+      const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/api/v1/clinic/delete-receptionist/${id}`, {
         method: 'DELETE',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
 
       const responseData = await response.json();
@@ -204,6 +209,7 @@ const ReceptionistManagement = () => {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
           },
           body: JSON.stringify(data),
         });
@@ -213,6 +219,7 @@ const ReceptionistManagement = () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
           },
           body: JSON.stringify(data),
         });

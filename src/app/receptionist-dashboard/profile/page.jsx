@@ -20,7 +20,21 @@ export default function ReceptionistProfilePage() {
 
         if (!staffId) return;
 
-        const res = await fetch(`${API_BASE_URL}/api/v1/clinic/update-receptionist/${staffId}`);
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        const res = await fetch(`${API_BASE_URL}/api/v1/clinic/update-receptionist/${staffId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (res.status === 401) {
+          localStorage.clear();
+          window.location.href = '/receptionist-login';
+          return;
+        }
+
         const result = await res.json();
         if (result.success && result.data.staff) {
           setStaffData(result.data.staff);
@@ -53,9 +67,13 @@ export default function ReceptionistProfilePage() {
 
       // Only attempt backend update if it's a real staff ID from mongo
       if (staffId && staffId.length === 24) {
+          const token = localStorage.getItem('token');
           const res = await fetch(`${API_BASE_URL}/api/v1/clinic/update-receptionist/${staffId}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
             body: JSON.stringify({
               firstName: staffData.firstName,
               lastName: staffData.lastName,

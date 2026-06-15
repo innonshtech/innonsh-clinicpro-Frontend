@@ -30,7 +30,7 @@ export default function ClinicSettings() {
       sunday: { open: '', close: '' },
     },
     description: 'A modern healthcare facility providing comprehensive medical services with cutting-edge technology and compassionate care.',
-    logo: '/clinic-logo-placeholder.jpg',
+    logo: 'https://ui-avatars.com/api/?name=Clinic+Pro&background=random',
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -41,7 +41,10 @@ export default function ClinicSettings() {
 
   const fetchUserData = async (id) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/clinic/fetchProfileData/${id}`);
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE_URL}/api/v1/clinic/fetchProfileData/${id}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
       const responseData = await res.json();
       if (responseData.success && responseData.data) {
         setFormData(responseData.data.clinic);

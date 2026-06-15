@@ -38,7 +38,10 @@ const[doctorId,setID]=useState();
 
   const fetchDoctorProfile = async (id) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/clinic/fetchProfileData/${id}`);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/api/v1/clinic/fetchProfileData/${id}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
       const data = await response.json();
       if (data.success && data.data.clinic) {
         setClinicId(data.data.clinic.clinicId);
@@ -53,7 +56,10 @@ const[doctorId,setID]=useState();
     setLoading(true);
     setError('');
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/clinic/fetch-receptionist/${clinicId}`);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/api/v1/clinic/fetch-receptionist/${clinicId}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
       const data = await response.json();
       if (data.success) {
         setReceptionists(data.data.staff || []);
@@ -98,8 +104,10 @@ const[doctorId,setID]=useState();
     }
 
     try {
+      const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/api/v1/clinic/delete-receptionist/${id}`, {
         method: 'DELETE',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       const data = await response.json();
 
@@ -163,6 +171,7 @@ const[doctorId,setID]=useState();
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
           },
           body: JSON.stringify(apiData),
         });
@@ -172,6 +181,7 @@ const[doctorId,setID]=useState();
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
           },
           body: JSON.stringify(apiData),
         });

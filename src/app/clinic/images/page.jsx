@@ -277,7 +277,10 @@ export default function ManageImages() {
     try {
       if (!userID) return;
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/clinic/fetch-images/${userID}`);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/api/v1/clinic/fetch-images/${userID}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
       const responseData = await response.json();
 
       if (responseData.success) {
@@ -345,10 +348,12 @@ export default function ManageImages() {
   const confirmDelete = async () => {
     try {
       // Call API to delete image from backend
+      const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/api/v1/clinic/delete-image/${userID}`, {
-        method: 'PATCH',
+        method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify({ imageUrl: imgToDelete }),
       });
@@ -393,10 +398,12 @@ export default function ManageImages() {
 
         const cloudinaryUrl = await uploadImageToCloudinary(file);
         
+        const token = localStorage.getItem('token');
         const response = await fetch(`${API_BASE_URL}/api/v1/clinic/add-image/${userID}`, {
-          method: 'PATCH',
+          method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
           },
           body: JSON.stringify({ imageUrl: cloudinaryUrl }),
         });

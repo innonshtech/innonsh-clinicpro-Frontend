@@ -15,7 +15,10 @@ export default function PendingRequestPage() {
     const fetchUser = async () => {
       try {
         // Replace with your actual API endpoint
-        const response = await fetch(`${API_BASE_URL}/api/v1/clinic/fetch-by-id/${userId}`);
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/api/v1/clinic/fetch-by-id/${userId}`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
         const result = await response.json();
         if (result.success) {
           setUser(result.data.clinic);

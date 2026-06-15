@@ -28,9 +28,15 @@ export const appointmentService = {
 
     if (!response.ok) {
       const errorData = await response.json();
+      if (response.status === 401 || errorData.errorCode === 'INVALID_TOKEN') {
+        if (typeof window !== 'undefined') {
+          localStorage.clear();
+          window.location.href = '/receptionist-login';
+          return { success: false }; // Prevent throwing to keep terminal clean
+        }
+      }
       const err = new Error(errorData.message || 'Failed to book appointment');
-      err.code = errorData?.error?.code || errorData.code; // apiResponse usually puts error object in 'error' field.
-      // Let's attach the full body just in case
+      err.code = errorData?.error?.code || errorData.code;
       err.responseBody = errorData;
       throw err;
     }
@@ -44,28 +50,38 @@ export const appointmentService = {
    * @param {string} token - Auth JWT token
    */
   async getAppointments(params = {}, token) {
-    const query = new URLSearchParams({
-      page: params.page || 1,
-      limit: params.limit || 10,
-      ...(params.doctorId && { doctorId: params.doctorId }),
-      ...(params.date && { date: params.date }),
-      ...(params.status && { status: params.status }),
-    }).toString();
+    try {
+      const query = new URLSearchParams({
+        page: params.page || 1,
+        limit: params.limit || 10,
+        ...(params.doctorId && { doctorId: params.doctorId }),
+        ...(params.date && { date: params.date }),
+        ...(params.status && { status: params.status }),
+      }).toString();
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/appointment/list?${query}`, {
-      cache: 'no-store', // Disable caching for real-time dashboard data
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
+      const response = await fetch(`${API_BASE_URL}/api/v1/appointment/list?${query}`, {
+        cache: 'no-store', // Disable caching for real-time dashboard data
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to fetch appointments');
+      if (!response.ok) {
+        const error = await response.json();
+        if (response.status === 401 || error.errorCode === 'INVALID_TOKEN') {
+          if (typeof window !== 'undefined') {
+            localStorage.clear();
+            window.location.href = '/receptionist-login';
+          }
+        }
+        return { success: false, data: [] };
+      }
+
+      return await response.json();
+    } catch (err) {
+      return { success: false, data: [] };
     }
-
-    return response.json();
   },
 
   /**
@@ -86,6 +102,13 @@ export const appointmentService = {
 
     if (!response.ok) {
       const error = await response.json();
+      if (response.status === 401 || error.errorCode === 'INVALID_TOKEN') {
+        if (typeof window !== 'undefined') {
+          localStorage.clear();
+          window.location.href = '/receptionist-login';
+          return { success: false }; // Prevent throwing to keep terminal clean
+        }
+      }
       throw new Error(error.message || 'Failed to update status');
     }
 
@@ -107,6 +130,13 @@ export const appointmentService = {
 
     if (!response.ok) {
       const error = await response.json();
+      if (response.status === 401 || error.errorCode === 'INVALID_TOKEN') {
+        if (typeof window !== 'undefined') {
+          localStorage.clear();
+          window.location.href = '/receptionist-login';
+          return { success: false }; // Prevent throwing to keep terminal clean
+        }
+      }
       throw new Error(error.message || 'Failed to cancel appointment');
     }
 
@@ -126,6 +156,13 @@ export const appointmentService = {
 
     if (!response.ok) {
       const error = await response.json();
+      if (response.status === 401 || error.errorCode === 'INVALID_TOKEN') {
+        if (typeof window !== 'undefined') {
+          localStorage.clear();
+          window.location.href = '/receptionist-login';
+          return { success: false }; // Prevent throwing to keep terminal clean
+        }
+      }
       throw new Error(error.message || 'Failed to fetch appointment history');
     }
 
@@ -149,6 +186,13 @@ export const appointmentService = {
 
     if (!response.ok) {
       const error = await response.json();
+      if (response.status === 401 || error.errorCode === 'INVALID_TOKEN') {
+        if (typeof window !== 'undefined') {
+          localStorage.clear();
+          window.location.href = '/receptionist-login';
+          return { success: false }; // Prevent throwing to keep terminal clean
+        }
+      }
       throw new Error(error.message || 'Check-in failed');
     }
 
@@ -173,6 +217,13 @@ export const appointmentService = {
 
     if (!response.ok) {
       const error = await response.json();
+      if (response.status === 401 || error.errorCode === 'INVALID_TOKEN') {
+        if (typeof window !== 'undefined') {
+          localStorage.clear();
+          window.location.href = '/receptionist-login';
+          return { success: false }; // Prevent throwing to keep terminal clean
+        }
+      }
       throw new Error(error.message || 'Reschedule failed');
     }
 

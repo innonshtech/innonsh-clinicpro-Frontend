@@ -69,7 +69,7 @@ export default function DashboardStats() {
         dailyRevenue: revenue
       });
     } catch (err) {
-      console.error("Stats Fetch Error:", err);
+      // console.error("Stats Fetch Error:", err);
     } finally {
       setLoading(false);
     }

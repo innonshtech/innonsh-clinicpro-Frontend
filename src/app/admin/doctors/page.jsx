@@ -1421,7 +1421,7 @@ export default function DoctorsPage() {
           className="max-h-64 object-contain rounded-md border border-gray-200"
           onError={(e) => {
             e.target.onerror = null; 
-            e.target.src = "https://via.placeholder.com/300x400?text=Identity+Proof+Not+Available";
+            e.target.src = "https://ui-avatars.com/api/?name=Identity+Proof+Not+Available&background=random";
           }}
         />
       </div>
@@ -1438,7 +1438,7 @@ export default function DoctorsPage() {
           className="max-h-64 object-contain rounded-md border border-gray-200"
           onError={(e) => {
             e.target.onerror = null; 
-            e.target.src = "https://via.placeholder.com/300x400?text=Degree+Certificate+Not+Available";
+            e.target.src = "https://ui-avatars.com/api/?name=Degree+Certificate+Not+Available&background=random";
           }}
         />
       </div>

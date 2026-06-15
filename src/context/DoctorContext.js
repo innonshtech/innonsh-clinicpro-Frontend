@@ -10,7 +10,10 @@ export const DoctorProvider = ({ children }) => {
 
   const fetchDoctorInfo = async (id) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/doctor/fetch-by-id/${id}`);
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE_URL}/api/v1/doctor/fetch-by-id/${id}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
       if (!res.ok) throw new Error('Failed to fetch doctor info');
       const response = await res.json();
       if (response.success && response.data) {

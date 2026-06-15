@@ -849,7 +849,10 @@ export default function DoctorDetailsPage() {
     const fetchDoctor = async () => {
       try {
         setIsLoading(true);
-        let res = await fetch(`${API_BASE_URL}/api/v1/doctor/fetch-by-id/${id}`);
+        const token = localStorage.getItem('token');
+        let res = await fetch(`${API_BASE_URL}/api/v1/doctor/fetch-by-id/${id}`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
         const data = await res.json();
         
         if (data.success) {
