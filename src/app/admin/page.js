@@ -14,14 +14,17 @@ export default function Dashboard() {
     const fetchData = async () => {
       try {
         setLoading(true)
+        const token = localStorage.getItem('token') || '';
+        const headers = { Authorization: `Bearer ${token}` };
+
         // Fetch doctors count
-        const doctorsResponse = await axios.get(`${API_BASE_URL}/api/v1/doctor/fetchAll`)
+        const doctorsResponse = await axios.get(`${API_BASE_URL}/api/v1/doctor/fetchAll`, { headers })
         if (doctorsResponse.data.success) {
           setDoctorsCount(doctorsResponse.data.data.doctors.length)
         }
         
         // Fetch clinics count and recent clinics
-        const clinicsResponse = await axios.get(`${API_BASE_URL}/api/v1/clinic/fetch-all-clinics`)
+        const clinicsResponse = await axios.get(`${API_BASE_URL}/api/v1/clinic/fetch-all-clinics`, { headers })
         if (clinicsResponse.data.success) {
           const clinics = clinicsResponse.data.data.clinics || [];
           setClinicsCount(clinics.length)

@@ -41,7 +41,13 @@ export default function ClinicsManage() {
     const fetchClinics = async () => {
       try {
         setLoading(true)
-        const res = await fetch(`${API_BASE_URL}/api/v1/clinic/fetch-all-clinics`)
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const token = localStorage.getItem('token') || user.token || '';
+        const res = await fetch(`${API_BASE_URL}/api/v1/clinic/fetch-all-clinics`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
 
         if (!res.ok) {
           throw new Error('Failed to fetch clinics')
@@ -167,10 +173,13 @@ export default function ClinicsManage() {
   const handleApproveClinic = async (id) => {
     try {
       setLoading(true);
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const token = localStorage.getItem('token') || user.token || '';
       const response = await fetch(`${API_BASE_URL}/api/v1/clinic/update-status/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           status: 'active',
@@ -204,10 +213,13 @@ export default function ClinicsManage() {
 
     try {
       setLoading(true);
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const token = localStorage.getItem('token') || user.token || '';
       const response = await fetch(`${API_BASE_URL}/api/v1/clinic/update-status/${selectedClinic._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
 

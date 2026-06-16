@@ -49,7 +49,7 @@ export default function ClinicSettings() {
       if (responseData.success && responseData.data) {
         setFormData(responseData.data.clinic);
       } else {
-        throw new Error(response.message || 'Failed to fetch clinic info');
+        throw new Error(responseData.message || 'Failed to fetch clinic info');
       }
     } catch (err) {
       console.error(err);

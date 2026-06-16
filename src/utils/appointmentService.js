@@ -31,7 +31,7 @@ export const appointmentService = {
       if (response.status === 401 || errorData.errorCode === 'INVALID_TOKEN') {
         if (typeof window !== 'undefined') {
           localStorage.clear();
-          window.location.href = '/receptionist-login';
+          window.location.href = '/login';
           return { success: false }; // Prevent throwing to keep terminal clean
         }
       }
@@ -72,7 +72,7 @@ export const appointmentService = {
         if (response.status === 401 || error.errorCode === 'INVALID_TOKEN') {
           if (typeof window !== 'undefined') {
             localStorage.clear();
-            window.location.href = '/receptionist-login';
+            window.location.href = '/login';
           }
         }
         return { success: false, data: [] };
@@ -105,7 +105,7 @@ export const appointmentService = {
       if (response.status === 401 || error.errorCode === 'INVALID_TOKEN') {
         if (typeof window !== 'undefined') {
           localStorage.clear();
-          window.location.href = '/receptionist-login';
+          window.location.href = '/login';
           return { success: false }; // Prevent throwing to keep terminal clean
         }
       }
@@ -133,7 +133,7 @@ export const appointmentService = {
       if (response.status === 401 || error.errorCode === 'INVALID_TOKEN') {
         if (typeof window !== 'undefined') {
           localStorage.clear();
-          window.location.href = '/receptionist-login';
+          window.location.href = '/login';
           return { success: false }; // Prevent throwing to keep terminal clean
         }
       }
@@ -159,7 +159,7 @@ export const appointmentService = {
       if (response.status === 401 || error.errorCode === 'INVALID_TOKEN') {
         if (typeof window !== 'undefined') {
           localStorage.clear();
-          window.location.href = '/receptionist-login';
+          window.location.href = '/login';
           return { success: false }; // Prevent throwing to keep terminal clean
         }
       }
@@ -189,7 +189,7 @@ export const appointmentService = {
       if (response.status === 401 || error.errorCode === 'INVALID_TOKEN') {
         if (typeof window !== 'undefined') {
           localStorage.clear();
-          window.location.href = '/receptionist-login';
+          window.location.href = '/login';
           return { success: false }; // Prevent throwing to keep terminal clean
         }
       }
@@ -220,7 +220,7 @@ export const appointmentService = {
       if (response.status === 401 || error.errorCode === 'INVALID_TOKEN') {
         if (typeof window !== 'undefined') {
           localStorage.clear();
-          window.location.href = '/receptionist-login';
+          window.location.href = '/login';
           return { success: false }; // Prevent throwing to keep terminal clean
         }
       }
