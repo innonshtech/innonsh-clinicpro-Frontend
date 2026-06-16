@@ -31,7 +31,7 @@ export default function ReceptionistProfilePage() {
 
         if (res.status === 401) {
           localStorage.clear();
-          window.location.href = '/receptionist-login';
+          window.location.href = '/login';
           return;
         }
 

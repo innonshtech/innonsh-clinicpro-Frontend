@@ -22,7 +22,7 @@ export const doctorService = {
         if (response.status === 401 || error.errorCode === 'INVALID_TOKEN') {
           if (typeof window !== 'undefined') {
             localStorage.clear();
-            window.location.href = '/receptionist-login';
+            window.location.href = '/login';
           }
         }
         return { success: false, data: { doctors: [] } };
@@ -54,7 +54,7 @@ export const doctorService = {
         if (response.status === 401 || error.errorCode === 'INVALID_TOKEN') {
           if (typeof window !== 'undefined') {
             localStorage.clear();
-            window.location.href = '/receptionist-login';
+            window.location.href = '/login';
           }
         }
         return { success: false, data: [] };

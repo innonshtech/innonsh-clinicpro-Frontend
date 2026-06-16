@@ -55,7 +55,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
         if (res.status === 401) {
           localStorage.clear();
-          window.location.href = '/receptionist-login';
+          window.location.href = '/login';
           return;
         }
 

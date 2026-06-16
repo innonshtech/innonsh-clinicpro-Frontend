@@ -620,7 +620,7 @@ const ConsultationDesk = () => {
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Chronic Conditions</h3>
                 <div className="flex flex-wrap gap-2">
                   {patient?.medicalHistory ? (
-                    <span className="px-3 py-1 bg-red-50 text-red-600 text-[10px] font-bold rounded-full border border-red-100">{patient.medicalHistory}</span>
+                    <span className="px-3 py-2 bg-red-50 text-red-600 text-[10px] font-bold rounded-xl border border-red-100 break-words break-all max-w-full inline-block">{patient.medicalHistory}</span>
                   ) : (
                     <span className="text-xs text-slate-400 italic">None recorded</span>
                   )}
@@ -1012,9 +1012,9 @@ const CompletionHub = ({ patientName, nextPatient, onDashboard, onNext }) => {
 const ContextItem = ({ icon, label, value }) => (
   <div className="flex items-start gap-4">
     <div className="mt-1 text-slate-400">{icon}</div>
-    <div>
+    <div className="flex-1 min-w-0">
       <p className="text-[10px] font-bold text-slate-400 uppercase leading-none mb-1">{label}</p>
-      <p className="text-sm font-semibold text-slate-700">{value || 'N/A'}</p>
+      <p className="text-sm font-semibold text-slate-700 break-words break-all whitespace-pre-wrap">{value || 'N/A'}</p>
     </div>
   </div>
 );
