@@ -781,10 +781,10 @@ p  { color: var(--ink-60); line-height: 1.65; }
 }
 .foot-icon {
   width: 44px; height: 44px; border-radius: 12px;
-  background: linear-gradient(135deg, #1170EF, #3B5BDB);
+  background: #ffffff;
   display: grid; place-items: center;
   font-size: 1.1rem; font-weight: 800; color: #fff;
-  box-shadow: 0 4px 14px rgba(17,112,239,0.35);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   flex-shrink: 0;
 }
 .foot-logo-text { display: flex; flex-direction: column; }
@@ -1354,7 +1354,9 @@ p  { color: var(--ink-60); line-height: 1.65; }
       {/**/}
       <div className="foot-brand">
         <a href="#!" onClick={(e) => e.preventDefault()} className="foot-logo">
-          <div className="foot-icon">I</div>
+          <div className="foot-icon">
+            <img src="/icons8-medical-bag-100.png" alt="ClinicPro Icon" style={{width:'36px',height:'36px',objectFit:'contain',borderRadius:'10px'}} />
+          </div>
           <div className="foot-logo-text">
             <div className="foot-logo-name">Innonsh <span>ClinicPro</span> <span className="foot-logo-dot"></span></div>
             <div className="foot-logo-tagline">Diagnose. Manage. Heal.</div>
