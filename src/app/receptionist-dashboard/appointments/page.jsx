@@ -440,7 +440,7 @@ const AppointmentsDashboardContent = () => {
   const [pagination,       setPagination]        = useState({ page: 1, totalPages: 1, total: 0, limit: 10 });
   const [token,            setToken]             = useState('');
   const [isUpdatingStatus, setIsUpdatingStatus]  = useState(false);
-  const [activeTab,        setActiveTab]         = useState('todays_bookings');
+  const [activeTab,        setActiveTab]         = useState('all');
 
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [isDrawerOpen,         setIsDrawerOpen]        = useState(false);
@@ -982,7 +982,28 @@ const AppointmentsDashboardContent = () => {
 
         <div style={{ display: 'flex', gap: '0.75rem', minWidth: 'max-content' }}>
           <div style={{ position: 'relative' }}>
+            <input 
+              type="date"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              style={{
+                padding: '10px 16px',
+                borderRadius: '9999px',
+                border: '1px solid #e5e7eb',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                color: '#374151',
+                background: '#fff',
+                outline: 'none',
+                cursor: 'pointer',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+              }}
+            />
+          </div>
+          <div style={{ position: 'relative' }}>
             <select
+              value={doctorFilter}
+              onChange={(e) => setDoctorFilter(e.target.value)}
               style={{
                 padding: '10px 40px 10px 16px',
                 borderRadius: '9999px',
@@ -997,7 +1018,10 @@ const AppointmentsDashboardContent = () => {
                 boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
               }}
             >
-              <option>All Doctors</option>
+              <option value="all">All Doctors</option>
+              {allDoctors.map(d => (
+                <option key={d._id} value={d._id}>Dr. {d.firstName} {d.lastName}</option>
+              ))}
             </select>
             <div style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#9ca3af' }}>
               <ChevronRight size={16} style={{ transform: 'rotate(90deg)' }} />

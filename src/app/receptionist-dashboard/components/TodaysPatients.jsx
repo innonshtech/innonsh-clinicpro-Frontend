@@ -182,7 +182,7 @@ export default function TodaysAppointments() {
             ))
           ) : (
             <>
-              {appointments.filter(app => ['checked_in', 'in_progress', 'completed'].includes(app.status)).length === 0 ? (
+              {appointments.filter(app => ['booked', 'scheduled', 'checked_in', 'in_progress'].includes(app.status)).length === 0 ? (
                 <div className="text-center py-20 bg-gray-50/50 rounded-[2.5rem] border-2 border-dashed border-gray-100">
                   <Search className="w-16 h-16 text-gray-200 mx-auto mb-4" />
                   <p className="text-gray-500 font-bold text-lg tracking-tight">
@@ -192,7 +192,7 @@ export default function TodaysAppointments() {
                 </div>
               ) : (
                 appointments
-                  .filter(app => ['checked_in', 'in_progress', 'completed'].includes(app.status))
+                  .filter(app => ['booked', 'scheduled', 'checked_in', 'in_progress'].includes(app.status))
                   .map((app) => (
 
               <div
