@@ -429,8 +429,7 @@ function AppointmentDetailDrawer({
 ───────────────────────────────────────────────────────── */
 const AppointmentsDashboardContent = () => {
   const searchParams = useSearchParams();
-  const todayStr = new Date().toISOString().split('T')[0];
-  const initialDate  = searchParams.get('date') || todayStr;
+  const initialDate  = searchParams.get('date') || '';
 
   const [searchTerm,       setSearchTerm]       = useState('');
   const [doctorFilter,     setDoctorFilter]      = useState('all');
@@ -441,7 +440,7 @@ const AppointmentsDashboardContent = () => {
   const [pagination,       setPagination]        = useState({ page: 1, totalPages: 1, total: 0, limit: 10 });
   const [token,            setToken]             = useState('');
   const [isUpdatingStatus, setIsUpdatingStatus]  = useState(false);
-  const [activeTab,        setActiveTab]         = useState('todays_bookings');
+  const [activeTab,        setActiveTab]         = useState('all');
 
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [isDrawerOpen,         setIsDrawerOpen]        = useState(false);
