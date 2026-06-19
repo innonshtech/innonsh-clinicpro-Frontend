@@ -10,7 +10,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@headlessui/react": "^2.2.4",
+    "@headlessui/react": "^2.2.10",
     "@heroicons/react": "^2.2.0",
     "@supabase/supabase-js": "^2.108.2",
     "@tanstack/react-table": "^8.21.3",
