@@ -15,7 +15,7 @@
     "@supabase/supabase-js": "^2.108.2",
     "@tanstack/react-table": "^8.21.3",
     "axios": "^1.9.0",
-    "chart.js": "^4.4.9",
+    "chart.js": "^4.5.1",
     "cloudinary": "^2.6.1",
     "clsx": "^2.1.1",
     "formik": "^2.4.9",
