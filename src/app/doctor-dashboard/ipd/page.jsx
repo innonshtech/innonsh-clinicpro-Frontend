@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { API_BASE_URL, getAuthHeaders } from '@/utils/api';
@@ -250,7 +250,7 @@ export function matchesIpdSearch(adm, query, doctorId, doctorName, docMap = {}) 
   );
 }
 
-export default function DoctorIpdPage() {
+function DoctorIpdPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialPatientId = searchParams.get('patientId');
@@ -2523,5 +2523,22 @@ export default function DoctorIpdPage() {
         );
       })()}
     </div>
+  );
+}
+
+export default function DoctorIpdPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="flex flex-col items-center gap-3">
+            <RefreshCw className="h-8 w-8 text-blue-600 animate-spin" />
+            <p className="text-sm font-medium text-slate-600">Loading Inpatient Workspace...</p>
+          </div>
+        </div>
+      }
+    >
+      <DoctorIpdPageContent />
+    </Suspense>
   );
 }
