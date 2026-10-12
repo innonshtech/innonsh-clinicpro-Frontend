@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiUser, FiMail, FiPhone, FiLock, FiCalendar } from 'react-icons/fi';
 import { FaHeartbeat, FaUserInjured, FaClinicMedical } from 'react-icons/fa';
+import { validatePhoneNumber, handlePhoneKeyDown } from '@/utils/phoneValidation';
 
 export default function PatientRegistration() {
   const [formData, setFormData] = useState({
@@ -18,11 +19,13 @@ export default function PatientRegistration() {
     password: '',
     confirmPassword: ''
   });
+  const [phoneError, setPhoneError] = useState('');
 
   const [currentStep, setCurrentStep] = useState(1);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    if (name === 'phone') setPhoneError('');
     setFormData(prev => ({ 
       ...prev, 
       [name]: value,
@@ -75,7 +78,16 @@ export default function PatientRegistration() {
     }
   };
 
-  const nextStep = () => setCurrentStep(prev => prev + 1);
+  const nextStep = () => {
+    if (currentStep === 1) {
+      const err = validatePhoneNumber(formData.phone, true, 'Phone number');
+      if (err) {
+        setPhoneError(err);
+        return;
+      }
+    }
+    setCurrentStep(prev => prev + 1);
+  };
   const prevStep = () => setCurrentStep(prev => prev - 1);
 
   return (
@@ -157,8 +169,9 @@ export default function PatientRegistration() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><FiPhone className="h-5 w-5 text-gray-400" /></div>
-                      <input type="tel" name="phone" value={formData.phone} onChange={handleChange} className="pl-10 w-full rounded-lg border-gray-200 focus:border-blue-500 focus:ring-blue-500 py-3" placeholder="+1 (555) 123-4567" required />
+                      <input type="tel" name="phone" value={formData.phone} onChange={handleChange} onKeyDown={handlePhoneKeyDown} maxLength={10} className={`pl-10 w-full rounded-lg border ${phoneError ? 'border-red-500' : 'border-gray-200'} focus:border-blue-500 focus:ring-blue-500 py-3`} placeholder="10-digit mobile number" required />
                     </div>
+                    {phoneError && <p className="mt-1 text-xs text-red-600">{phoneError}</p>}
                   </div>
                   <div className="flex justify-end">
                     <motion.button type="button" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={nextStep} className="bg-blue-600 text-white py-3 px-6 rounded-lg shadow hover:bg-blue-700 transition">Next: Medical Info</motion.button>

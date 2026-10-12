@@ -53,7 +53,7 @@ useEffect(() => {
 
 
   return (
-    <DoctorContext.Provider value={{ doctor, loading }}>
+    <DoctorContext.Provider value={{ doctor, setDoctor, fetchDoctorInfo, loading }}>
       {children}
     </DoctorContext.Provider>
   );

@@ -6,6 +6,7 @@ import { FiUser, FiMail, FiPhone, FiLock, FiCalendar } from 'react-icons/fi';
 import { FaHeartbeat, FaUserInjured, FaClinicMedical, FaStethoscope } from 'react-icons/fa';
 import { useRouter } from 'next/navigation';
 import { API_BASE_URL } from '@/utils/api';
+import { validatePhoneNumber, handlePhoneKeyDown, validateEmail, validateDoctorEmail } from '@/utils/phoneValidation';
 
 const specialties = [
   'Cardiology', 'Neurology', 'Pediatrics', 'Orthopedics',
@@ -259,6 +260,11 @@ export default function RegistrationPortal() {
   const handlePatientSubmit = async (e) => {
     e.preventDefault();
     console.log("this is data", patientFormData)
+    const pPhoneErr = validatePhoneNumber(patientFormData.phone, true, 'Phone number');
+    if (pPhoneErr) {
+      alert(pPhoneErr);
+      return;
+    }
     if (currentPatientStep === 3) {
       setIsPatientLoading(true);
       try {
@@ -534,19 +540,21 @@ const handleDoctorInputChange = (field, value) => {
       if (!doctorFormData.profileImage) newErrors.profileImage = 'Profile image is required';
       if (!doctorFormData.dateOfBirth.trim()) newErrors.dateOfBirth = 'Date of birth is required';
       if (!doctorFormData.gender) newErrors.gender = 'Gender is required';
-      if (!doctorFormData.email.trim()) newErrors.email = 'Email is required';
-      else if (!/^\S+@\S+\.\S+$/.test(doctorFormData.email)) newErrors.email = 'Email is invalid';
+      const docEmailErr = validateDoctorEmail(doctorFormData.email, true, 'Email address');
+      if (docEmailErr) newErrors.email = docEmailErr;
       if (!doctorFormData.password) newErrors.password = 'Password is required';
       else if (doctorFormData.password.length < 8) newErrors.password = 'Password must be at least 8 characters';
       if (!doctorFormData.confirmPassword) newErrors.confirmPassword = 'Please confirm password';
       else if (doctorFormData.password !== doctorFormData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
-      if (!doctorFormData.phone.trim()) newErrors.phone = 'Phone is required';
+      const phoneErr = validatePhoneNumber(doctorFormData.phone, true, 'Phone number');
+      if (phoneErr) newErrors.phone = phoneErr;
     } else if (step === 1) {
       if (!doctorFormData.specialty) newErrors.specialty = 'Specialty is required';
       if (!doctorFormData.experience.trim()) newErrors.experience = 'Experience is required';
       if (!doctorFormData.hospital.trim()) newErrors.hospital = 'Hospital/clinic is required';
       if (!doctorFormData.consultantFee) newErrors.consultantFee = 'Consultation fee is required';
-      if (!doctorFormData.hospitalNumber.trim()) newErrors.hospitalNumber = 'Hospital contact number is required';
+      const hospPhoneErr = validatePhoneNumber(doctorFormData.hospitalNumber, true, 'Hospital contact number');
+      if (hospPhoneErr) newErrors.hospitalNumber = hospPhoneErr;
     } else if (step === 2) {
       if (doctorFormData.available.days.length === 0) newErrors.availableDays = 'Select at least one working day';
       if (!doctorFormData.available.timeSlots.from.hour ||
@@ -867,6 +875,8 @@ const handleDoctorInputChange = (field, value) => {
       if (!clinicFormData.clinicName.trim()) newErrors.clinicName = 'Clinic name is required';
     }
     else if (step === 1) {
+      const cPhoneErr = validatePhoneNumber(clinicFormData.phone, true, 'Phone number');
+      if (cPhoneErr) newErrors.phone = cPhoneErr;
       if (!clinicFormData.email.trim()) newErrors.email = 'Email is required';
       else if (!/^\S+@\S+\.\S+$/.test(clinicFormData.email)) newErrors.email = 'Invalid email format';
       if (!clinicFormData.password) newErrors.password = 'Password is required';
@@ -1385,8 +1395,10 @@ const handleDoctorInputChange = (field, value) => {
                   name="phone"
                   value={clinicFormData.phone}
                   onChange={handleClinicInputChange}
+                  onKeyDown={handlePhoneKeyDown}
+                  maxLength={10}
                   className={`w-full px-4 py-3 bg-white border-2 rounded-xl transition-all duration-300 focus:ring-4 focus:ring-green-100 focus:border-green-500 hover:border-green-300 ${clinicErrors.phone ? 'border-red-500' : 'border-gray-200'}`}
-                  placeholder="+91 9876543210"
+                  placeholder="10-digit phone number (e.g. 9876543210)"
                 />
                 {clinicErrors.phone && (
                   <p className="mt-2 text-sm text-red-600 animate-shake">{clinicErrors.phone}</p>
@@ -2332,8 +2344,10 @@ const handleDoctorInputChange = (field, value) => {
                               name="phone"
                               value={patientFormData.phone}
                               onChange={handlePatientFormChange}
+                              onKeyDown={handlePhoneKeyDown}
+                              maxLength={10}
                               className="pl-10 w-full rounded-lg border-gray-200 focus:border-blue-500 focus:ring-blue-500 py-3"
-                              placeholder="+1 (555) 123-4567"
+                              placeholder="10-digit mobile number"
                               disabled={isPatientLoading}
                             />
                           </div>
@@ -2892,8 +2906,10 @@ const handleDoctorInputChange = (field, value) => {
                               type="tel"
                               value={doctorFormData.phone}
                               onChange={(e) => handleDoctorInputChange('phone', e.target.value)}
+                              onKeyDown={handlePhoneKeyDown}
+                              maxLength={10}
                               className={`pl-10 w-full rounded-lg border ${doctorErrors.phone ? 'border-red-300' : 'border-gray-200'} focus:border-indigo-500 focus:ring-indigo-500 py-3`}
-                              placeholder="+1 (555) 123-4567"
+                              placeholder="10-digit phone number"
                               disabled={isDoctorSubmitting}
                             />
                           </div>
@@ -3166,8 +3182,10 @@ const handleDoctorInputChange = (field, value) => {
                               type="tel"
                               value={doctorFormData.hospitalNumber}
                               onChange={(e) => handleDoctorInputChange('hospitalNumber', e.target.value)}
+                              onKeyDown={handlePhoneKeyDown}
+                              maxLength={10}
                               className={`pl-10 w-full rounded-lg border ${doctorErrors.hospitalNumber ? 'border-red-300' : 'border-gray-200'} focus:border-indigo-500 focus:ring-indigo-500 py-3`}
-                              placeholder="Hospital phone number"
+                              placeholder="10-digit hospital phone number"
                               disabled={isDoctorSubmitting}
                             />
                           </div>

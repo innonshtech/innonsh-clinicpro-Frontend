@@ -13,6 +13,49 @@ import {
 import { API_BASE_URL } from '@/utils/api';
 import toast, { Toaster } from 'react-hot-toast';
 
+// Helper to safely parse and format calendar dates without timezone shift
+const formatCalendarDate = (dateVal) => {
+  if (!dateVal) return { month: '', day: '', weekdayYear: '' };
+  let year, month, day;
+  if (typeof dateVal === 'string') {
+    const cleanDate = dateVal.split('T')[0];
+    const parts = cleanDate.split('-');
+    if (parts.length === 3) {
+      year = parseInt(parts[0], 10);
+      month = parseInt(parts[1], 10) - 1;
+      day = parseInt(parts[2], 10);
+    }
+  }
+
+  if (!year || isNaN(month) || !day) {
+    const d = new Date(dateVal);
+    year = d.getFullYear();
+    month = d.getMonth();
+    day = d.getDate();
+  }
+
+  // Noon avoids timezone midnight rollback across any timezone
+  const dateObj = new Date(year, month, day, 12, 0, 0);
+
+  return {
+    month: dateObj.toLocaleDateString('en-US', { month: 'short' }),
+    day: day,
+    weekdayYear: dateObj.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric' })
+  };
+};
+
+const getCalendarDateStr = (val) => {
+  if (!val) return '';
+  if (typeof val === 'string') {
+    return val.split('T')[0];
+  }
+  const d = new Date(val);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const ManageLeavePage = () => {
   const [leaves, setLeaves] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -65,9 +108,9 @@ const ManageLeavePage = () => {
       const apptData = await apptRes.json();
       
       if (apptData.success) {
-        const targetDateStr = new Date(newLeave.date).toISOString().split('T')[0];
+        const targetDateStr = getCalendarDateStr(newLeave.date);
         const conflictingAppts = (apptData.data.appointments || []).filter(app => {
-          const appDateStr = new Date(app.appointmentDate).toISOString().split('T')[0];
+          const appDateStr = getCalendarDateStr(app.appointmentDate);
           return appDateStr === targetDateStr && app.status === 'booked';
         });
         
@@ -153,7 +196,7 @@ const ManageLeavePage = () => {
                 <input 
                   type="date" 
                   required
-                  min={new Date().toISOString().split('T')[0]}
+                  min={getCalendarDateStr(new Date())}
                   value={newLeave.date}
                   onChange={(e) => setNewLeave({...newLeave, date: e.target.value})}
                   className="w-full p-3 border border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500/30 outline-none text-gray-700" 
@@ -211,34 +254,37 @@ const ManageLeavePage = () => {
               </div>
             ) : (
               <div className="divide-y divide-gray-100">
-                {leaves.map((leave) => (
-                  <div key={leave._id} className="p-6 flex items-center justify-between hover:bg-gray-50 transition-colors group">
-                    <div className="flex items-center gap-4">
-                      <div className="w-14 h-14 bg-rose-50 border border-rose-100 rounded-2xl flex flex-col items-center justify-center text-rose-600">
-                        <span className="text-[10px] font-bold uppercase tracking-tighter">
-                          {new Date(leave.date).toLocaleDateString('en-US', { month: 'short' })}
-                        </span>
-                        <span className="text-xl font-extrabold leading-none">
-                          {new Date(leave.date).getDate()}
-                        </span>
+                {leaves.map((leave) => {
+                  const formatted = formatCalendarDate(leave.date);
+                  return (
+                    <div key={leave._id} className="p-6 flex items-center justify-between hover:bg-gray-50 transition-colors group">
+                      <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 bg-rose-50 border border-rose-100 rounded-2xl flex flex-col items-center justify-center text-rose-600">
+                          <span className="text-[10px] font-bold uppercase tracking-tighter">
+                            {formatted.month}
+                          </span>
+                          <span className="text-xl font-extrabold leading-none">
+                            {formatted.day}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-900">
+                            {formatted.weekdayYear}
+                          </p>
+                          <p className="text-sm text-gray-500 flex items-center gap-1">
+                            <Clock size={12} /> {leave.reason}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-bold text-gray-900">
-                          {new Date(leave.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric' })}
-                        </p>
-                        <p className="text-sm text-gray-500 flex items-center gap-1">
-                          <Clock size={12} /> {leave.reason}
-                        </p>
-                      </div>
+                      <button 
+                        onClick={() => handleDeleteLeave(leave._id)}
+                        className="p-3 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                      >
+                        <Trash2 size={20} />
+                      </button>
                     </div>
-                    <button 
-                      onClick={() => handleDeleteLeave(leave._id)}
-                      className="p-3 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
-                    >
-                      <Trash2 size={20} />
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

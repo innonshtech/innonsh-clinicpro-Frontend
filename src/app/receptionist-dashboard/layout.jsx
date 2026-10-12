@@ -39,7 +39,7 @@ export default function DashboardLayout({ children }) {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto h-screen lg:ml-0 transition-all duration-300">
         <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
-        <main className="p-6 lg:p-8 relative z-10">
+        <main className="p-6 lg:p-8 relative">
           {children}
         </main>
       </div>

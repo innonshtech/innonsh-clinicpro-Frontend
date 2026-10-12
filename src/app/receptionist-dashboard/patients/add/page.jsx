@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { validatePhoneNumber, handlePhoneKeyDown } from '@/utils/phoneValidation';
 import { ArrowLeft, Save, User, Phone, Mail, Calendar, MapPin, FileText, Droplet, Lock } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { patientService } from '@/utils/patientService';
@@ -66,6 +67,11 @@ export default function AddPatientPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const phoneErr = validatePhoneNumber(formData.phoneNumber, true, 'Phone number');
+    if (phoneErr) {
+      alert(phoneErr);
+      return;
+    }
     setIsSubmitting(true);
     setError(null);
 
@@ -267,9 +273,11 @@ export default function AddPatientPage() {
                       name="phoneNumber"
                       value={formData.phoneNumber}
                       onChange={handleChange}
+                      onKeyDown={handlePhoneKeyDown}
+                      maxLength={10}
                       required
                       className="w-full px-4 py-2.5 pl-12 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-blue-300 bg-white"
-                      placeholder="(555) 123-4567"
+                      placeholder="10-digit mobile number"
                     />
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <Phone className="h-5 w-5 text-blue-400" />

@@ -1,7 +1,7 @@
 'use client';
 import { API_BASE_URL } from '@/utils/api';
-
-           import { useState, useEffect } from 'react';
+import { validatePhoneNumber, handlePhoneKeyDown } from '@/utils/phoneValidation';
+import { useState, useEffect } from 'react';
 import { FiSearch, FiUserPlus, FiEdit2, FiTrash2, FiChevronLeft, FiChevronRight, FiX, FiEye, FiEyeOff } from 'react-icons/fi';
 import { MdOutlineVerified, MdOutlinePending } from 'react-icons/md';
 import { User, X, Eye, EyeOff } from 'lucide-react';
@@ -134,6 +134,13 @@ const[doctorId,setID]=useState();
     setError('');
 
     const formData = new FormData(e.target);
+    const phoneVal = formData.get('phone');
+    const phoneErr = validatePhoneNumber(phoneVal, true, 'Phone number');
+    if (phoneErr) {
+      alert(phoneErr);
+      setSubmitLoading(false);
+      return;
+    }
     const apiData = {
       firstName: formData.get('firstName'),
       lastName: formData.get('lastName'),
@@ -445,9 +452,11 @@ const[doctorId,setID]=useState();
                 type="tel"
                 name="phone"
                 required
+                onKeyDown={handlePhoneKeyDown}
+                maxLength={10}
                 className="w-full border border-blue-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-blue-50/50 hover:bg-blue-50"
                 defaultValue={currentReceptionist?.phone || ''}
-                placeholder="Enter phone number"
+                placeholder="10-digit phone number"
               />
             </div>
 

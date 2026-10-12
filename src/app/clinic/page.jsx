@@ -7,8 +7,34 @@ import {
   Users,
   Calendar,
   ClipboardList,
-  Bell
+  Bell,
+  CheckCircle2,
+  CalendarX2,
+  UserX,
+  ArrowRight
 } from 'lucide-react'
+
+// Helper to format next upcoming leave as "DD MMM YYYY"
+const formatNextLeaveDate = (dateVal) => {
+  if (!dateVal) return '';
+  const clean = typeof dateVal === 'string' ? dateVal.split('T')[0] : '';
+  const parts = clean.split('-');
+  if (parts.length === 3) {
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    const d = new Date(year, month, day, 12, 0, 0);
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+  const d = new Date(dateVal);
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+const getDoctorInitials = (firstName, lastName) => {
+  const f = firstName ? firstName.trim().charAt(0).toUpperCase() : '';
+  const l = lastName ? lastName.trim().charAt(0).toUpperCase() : '';
+  return f + l || 'DR';
+};
 
 export default function ClinicDashboard() {
   const [loading, setLoading] = useState(true)
@@ -21,7 +47,8 @@ export default function ClinicDashboard() {
       appointmentsToday: 0,
       pendingAppointments: 0
     },
-    appointments: []
+    appointments: [],
+    doctorAvailability: []
   })
 
   useEffect(() => {
@@ -93,6 +120,11 @@ export default function ClinicDashboard() {
     }
   ]
 
+  const doctorList = dashboardData.doctorAvailability || [];
+  const availableCount = doctorList.filter(d => d.status === 'available').length;
+  const onLeaveCount = doctorList.filter(d => d.status === 'on_leave').length;
+  const inactiveCount = doctorList.filter(d => d.status === 'inactive').length;
+
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
       {/* Page Header */}
@@ -131,6 +163,155 @@ export default function ClinicDashboard() {
             </div>
           )
         })}
+      </div>
+
+      {/* Doctor Availability Section */}
+      <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+              <Stethoscope className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 leading-tight">Doctor Availability</h2>
+              <p className="text-xs text-slate-500">Real-time daily schedule and leave status</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Compact summary chip */}
+            <div className="inline-flex items-center gap-2 text-xs font-semibold px-3 py-1.5 bg-slate-50 border border-slate-200/80 rounded-full text-slate-700">
+              <span className="inline-flex items-center gap-1.5 text-emerald-700">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                {availableCount} Available
+              </span>
+              <span className="text-slate-300">•</span>
+              <span className="inline-flex items-center gap-1.5 text-rose-700">
+                <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" />
+                {onLeaveCount} On Leave
+              </span>
+              <span className="text-slate-300">•</span>
+              <span className="inline-flex items-center gap-1.5 text-slate-600">
+                <span className="w-2 h-2 rounded-full bg-slate-400 inline-block" />
+                {inactiveCount} Inactive
+              </span>
+            </div>
+
+            <a 
+              href="/clinic/doctors" 
+              className="hidden md:inline-flex items-center text-xs font-semibold text-blue-600 hover:text-blue-700 gap-1 ml-1"
+            >
+              Manage <ArrowRight className="w-3.5 h-3.5" />
+            </a>
+          </div>
+        </div>
+
+        {loading ? (
+          <p className="text-slate-400 text-sm py-4">Loading doctor availability...</p>
+        ) : doctorList.length === 0 ? (
+          <div className="text-center py-8 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+            <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+            <p className="text-sm font-semibold text-slate-700">No doctors registered yet</p>
+            <p className="text-xs text-slate-400 mt-0.5">Add doctors to track their daily availability and leave schedules.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {doctorList.map((doc) => {
+              const fullName = `Dr. ${doc.firstName} ${doc.lastName}`.trim();
+              const hasPhoto = Boolean(
+                doc.profileImage && 
+                typeof doc.profileImage === 'string' && 
+                doc.profileImage.trim().length > 0 &&
+                !doc.profileImage.includes('placeholder')
+              );
+              const nextLeave = doc.upcomingLeaves && doc.upcomingLeaves.length > 0 ? doc.upcomingLeaves[0] : null;
+
+              return (
+                <div 
+                  key={doc.id}
+                  className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/40 hover:bg-white hover:border-slate-200 hover:shadow-sm transition-all flex flex-col justify-between gap-2.5"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {hasPhoto ? (
+                        <img 
+                          src={doc.profileImage} 
+                          alt={fullName}
+                          className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0" 
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-50 to-indigo-100 border border-blue-200/50 text-blue-700 font-bold text-xs flex items-center justify-center shrink-0">
+                          {getDoctorInitials(doc.firstName, doc.lastName)}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-sm text-slate-900 truncate" title={fullName}>
+                          {fullName}
+                        </h3>
+                        <p className="text-xs text-slate-500 truncate">
+                          {doc.specialty || 'General Practitioner'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Status badge */}
+                    <div className="shrink-0">
+                      {doc.status === 'on_leave' ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                          On Leave
+                        </span>
+                      ) : doc.status === 'inactive' ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                          Inactive
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          Available
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Leave details note */}
+                  <div className="pt-2 border-t border-slate-100/80 text-xs flex items-center gap-1.5 min-w-0">
+                    {doc.status === 'on_leave' ? (
+                      <span className="text-rose-700 font-medium truncate flex items-center gap-1">
+                        <CalendarX2 className="w-3.5 h-3.5 shrink-0 text-rose-500" />
+                        <span>On Leave Today</span>
+                        {doc.todayLeaveReason && (
+                          <span className="text-rose-500 font-normal truncate">({doc.todayLeaveReason})</span>
+                        )}
+                      </span>
+                    ) : doc.status === 'inactive' ? (
+                      <span className="text-slate-400 truncate flex items-center gap-1">
+                        <UserX className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                        Account currently inactive
+                      </span>
+                    ) : nextLeave ? (
+                      <span className="text-amber-700 font-medium truncate flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5 shrink-0 text-amber-500" />
+                        <span>Next Leave: {formatNextLeaveDate(nextLeave.date)}</span>
+                        {doc.upcomingLeaves.length > 1 && (
+                          <span className="text-amber-600/80 font-normal shrink-0">
+                            (+{doc.upcomingLeaves.length - 1} more)
+                          </span>
+                        )}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 truncate flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-500" />
+                        Available for appointments
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Bottom Grid */}

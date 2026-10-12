@@ -505,8 +505,8 @@ const ConsultationDesk = () => {
 
           {/* AI SETTINGS MODAL */}
           {showAiSettings && (
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-              <div className="bg-white rounded-[40px] w-full max-w-md p-10 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] overflow-y-auto flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl w-full max-w-md p-6 sm:p-8 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[92vh] overflow-y-auto flex flex-col">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="bg-blue-600 p-2.5 rounded-2xl">
                     <Brain size={24} className="text-white" />

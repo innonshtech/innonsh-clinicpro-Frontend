@@ -147,3 +147,49 @@ body {
 input, select, textarea, button {
   transition: all 0.2s ease;
 }
+
+/* ==========================================================================
+   ClinicPro — Lab Account Global Layout, Modal & Toast Positioning
+   ========================================================================== */
+
+/* Remove artificial stacking context trap so fixed overlays & toasts escape to root */
+.lab-portal main {
+  position: static;
+  z-index: auto;
+}
+
+/* 
+   Global modal overlay positioning across all Lab modules:
+   - Starts with 4.5rem (72px) top padding so modal cards begin cleanly below the 64px header.
+   - Uses align-items: flex-start to prevent the CSS flexbox items-center overflow clipping bug.
+   - Backdrops stack at z-index: 60, fully covering the sticky header (z-40).
+*/
+.lab-portal .fixed.inset-0.z-50 {
+  z-index: 60 !important;
+  padding-top: 4.75rem !important; /* 76px, clear of 64px header */
+  padding-bottom: 1.5rem !important;
+  align-items: flex-start !important;
+}
+
+/* 
+   Global modal card dialog sizing:
+   - Constrains max-height to viewport height minus top clearance and bottom margin.
+   - Resets any outer vertical margins that push the top under the header.
+*/
+.lab-portal .fixed.inset-0.z-50 > div {
+  max-height: calc(100vh - 6.25rem) !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+@supports (max-height: 100dvh) {
+  .lab-portal .fixed.inset-0.z-50 > div {
+    max-height: calc(100dvh - 6.25rem) !important;
+  }
+}
+
+/* Ensure toast container inside lab account always stacks above navbar and modal */
+.lab-portal div[data-hot-toast-container],
+.lab-portal .toaster {
+  z-index: 99999 !important;
+}

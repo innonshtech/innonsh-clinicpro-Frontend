@@ -111,16 +111,16 @@ export default function MedicalRecords() {
       </div>
 
       {isViewModalOpen && selectedRecord && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-8 animate-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-center mb-6">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center p-6 border-b border-slate-100 shrink-0">
               <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                 <FileText className="text-blue-600" /> Medical Summary
               </h2>
-              <button onClick={() => setIsViewModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X /></button>
+              <button onClick={() => setIsViewModalOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"><X className="w-5 h-5" /></button>
             </div>
             
-            <div className="space-y-4">
+            <div className="p-6 overflow-y-auto space-y-4 flex-1">
               <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl">
                 <p className="text-xs text-slate-500 font-bold">Patient: <span className="text-slate-800">{selectedRecord.patientName}</span></p>
                 <p className="text-xs text-slate-500 font-bold">Date: <span className="text-slate-800">{selectedRecord.date}</span></p>

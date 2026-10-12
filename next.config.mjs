@@ -1,7 +1,15 @@
+import path from 'path';
+import { fileURLToPath } from 'url';
 import './src/env.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  turbopack: {
+    root: __dirname,
+  },
   images: {
     domains: ['res.cloudinary.com'],
   },
@@ -35,6 +43,20 @@ const nextConfig = {
             value: 'strict-origin-when-cross-origin'
           }
         ],
+      },
+    ];
+  },
+  async redirects() {
+    return [
+      {
+        source: '/admin/doctors',
+        destination: '/admin/clinics-manage',
+        permanent: false,
+      },
+      {
+        source: '/admin/doctors/add',
+        destination: '/admin/clinics-manage',
+        permanent: false,
       },
     ];
   },

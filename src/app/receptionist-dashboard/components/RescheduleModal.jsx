@@ -7,9 +7,9 @@ import toast from 'react-hot-toast';
 export default function RescheduleModal({ appointment, onClose, onRescheduled }) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    appointmentDate: new Date(appointment.appointmentDate).toISOString().split('T')[0],
-    timeSlot: appointment.timeSlot,
-    notes: appointment.notes || ''
+    appointmentDate: appointment?.appointmentDate ? new Date(appointment.appointmentDate).toISOString().split('T')[0] : '',
+    timeSlot: appointment?.timeSlot || '',
+    notes: appointment?.notes || ''
   });
 
   const slots = [
@@ -42,16 +42,16 @@ export default function RescheduleModal({ appointment, onClose, onRescheduled })
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-white/20">
+    <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200 flex flex-col max-h-[92vh]">
         {/* Header */}
-        <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-8 text-white relative overflow-hidden">
+        <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-6 sm:p-8 text-white relative overflow-hidden shrink-0">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl" />
           <div className="flex items-center justify-between relative z-10">
             <div>
               <h3 className="text-2xl font-black tracking-tight">Reschedule Visit</h3>
               <p className="text-blue-100 text-xs font-bold mt-1 uppercase tracking-widest opacity-80">
-                Updating Slot for {appointment.patientId?.firstName}
+                Updating Slot for {appointment?.patientId?.firstName || 'Patient'}
               </p>
             </div>
             <button 
@@ -63,7 +63,7 @@ export default function RescheduleModal({ appointment, onClose, onRescheduled })
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+        <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-6 overflow-y-auto flex-1">
           <div className="space-y-4">
             {/* Date Selection */}
             <div>

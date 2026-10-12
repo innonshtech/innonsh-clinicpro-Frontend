@@ -16,9 +16,18 @@ export async function POST(request) {
       return Response.json({ error: 'No file uploaded' }, { status: 400 });
     }
 
-    const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-      return Response.json({ error: 'Invalid file type. Only JPG, PNG, and WebP are allowed.' }, { status: 400 });
+    const ALLOWED_MIME_TYPES = [
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/webp',
+      'application/pdf'
+    ];
+    const isAllowedType = ALLOWED_MIME_TYPES.includes(file.type) || 
+      /\.(jpe?g|png|webp|pdf)$/i.test(file.name || '');
+
+    if (!isAllowedType) {
+      return Response.json({ error: 'Invalid file type. Only JPG, PNG, WebP, and PDF are allowed.' }, { status: 400 });
     }
 
     const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
@@ -26,12 +35,19 @@ export async function POST(request) {
       return Response.json({ error: 'File size exceeds 5MB limit.' }, { status: 400 });
     }
 
+    const isPdf = file.type === 'application/pdf' || (file.name || '').toLowerCase().endsWith('.pdf');
+    const requestedFolder = formData.get('folder');
+    const folder = requestedFolder || (isPdf ? 'doctor-documents' : 'doctor-profiles');
+
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
     const result = await new Promise((resolve, reject) => {
       cloudinary.uploader.upload_stream(
-        { folder: 'doctor-profiles' },
+        { 
+          folder,
+          resource_type: 'auto'
+        },
         (error, result) => {
           if (error) {
             reject(error);
@@ -43,11 +59,12 @@ export async function POST(request) {
     });
 
     return Response.json({
-      url: result.secure_url,
+      url: result.secure_url || result.url,
       public_id: result.public_id,
       width: result.width,
       height: result.height,
-      format: result.format
+      format: result.format,
+      resource_type: result.resource_type
     });
 
   } catch (error) {

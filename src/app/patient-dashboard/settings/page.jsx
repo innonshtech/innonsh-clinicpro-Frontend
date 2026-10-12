@@ -1,5 +1,6 @@
 'use client';
 import { API_BASE_URL } from '@/utils/api';
+import { validatePhoneNumber, handlePhoneKeyDown } from '@/utils/phoneValidation';
 import { 
   FiUser, FiMail, FiPhone, FiLock, FiCalendar, 
   FiMapPin, FiHome, FiDroplet, FiClipboard, 
@@ -221,6 +222,9 @@ console.log("asdf",userId)
                     type="tel"
                     value={patientData.phone}
                     onChange={(e) => setPatientData({...patientData, phone: e.target.value})}
+                    onKeyDown={handlePhoneKeyDown}
+                    maxLength={10}
+                    placeholder="10-digit phone number"
                     className="w-full pl-10 rounded-lg border-blue-100 bg-blue-50 focus:border-blue-300 focus:ring-2 focus:ring-blue-200 py-2.5 px-4 text-blue-800 placeholder-blue-400"
                   />
                 </div>

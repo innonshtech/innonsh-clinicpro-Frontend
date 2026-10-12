@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion'
 import { FaHeartbeat, FaUserInjured, FaClinicMedical } from 'react-icons/fa';
+import { validatePhoneNumber, handlePhoneKeyDown, validateDoctorEmail } from '@/utils/phoneValidation';
 import { 
   User, Mail, Phone, Lock, Eye, EyeOff, Stethoscope, 
   Calendar, GraduationCap, MapPin, ChevronDown, 
@@ -176,19 +177,21 @@ export default function DoctorSignup() {
       if (!formData.profileImage) newErrors.profileImage = 'Profile image is required'
       if (!formData.dateOfBirth.trim()) newErrors.dateOfBirth = 'Date of birth is required'
       if (!formData.gender) newErrors.gender = 'Gender is required'
-      if (!formData.email.trim()) newErrors.email = 'Email is required'
-      else if (!/^\S+@\S+\.\S+$/.test(formData.email)) newErrors.email = 'Email is invalid'
+      const emailErr = validateDoctorEmail(formData.email, true, 'Email address');
+      if (emailErr) newErrors.email = emailErr;
       if (!formData.password) newErrors.password = 'Password is required'
       else if (formData.password.length < 8) newErrors.password = 'Password must be at least 8 characters'
       if (!formData.confirmPassword) newErrors.confirmPassword = 'Please confirm password'
       else if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match'
-      if (!formData.phone.trim()) newErrors.phone = 'Phone is required'
+      const phoneErr = validatePhoneNumber(formData.phone, true, 'Phone number');
+      if (phoneErr) newErrors.phone = phoneErr;
     } else if (step === 2) {
       if (!formData.specialty) newErrors.specialty = 'Specialty is required'
       if (!formData.experience.trim()) newErrors.experience = 'Experience is required'
       if (!formData.hospital.trim()) newErrors.hospital = 'Hospital/clinic is required'
       if (!formData.consultantFee) newErrors.consultantFee = 'Consultation fee is required'
-      if (!formData.hospitalNumber.trim()) newErrors.hospitalNumber = 'Hospital contact number is required'
+      const hospPhoneErr = validatePhoneNumber(formData.hospitalNumber, true, 'Hospital contact number');
+      if (hospPhoneErr) newErrors.hospitalNumber = hospPhoneErr;
     } else if (step === 3) {
       if (formData.available.days.length === 0) newErrors.availableDays = 'Select at least one working day'
       if (!formData.available.time.trim()) newErrors.availableTime = 'Working hours are required'
@@ -548,8 +551,10 @@ export default function DoctorSignup() {
                                 type="tel"
                                 value={formData.phone}
                                 onChange={(e) => handleInputChange('phone', e.target.value)}
+                                onKeyDown={handlePhoneKeyDown}
+                                maxLength={10}
                                 className={`pl-9 w-full rounded-lg border-gray-200 focus:border-blue-500 focus:ring-blue-500 py-2 text-sm ${errors.phone ? 'border-red-300' : ''}`}
-                                placeholder="+1 (555) 123-4567"
+                                placeholder="10-digit phone number (e.g. 9876543210)"
                                 required
                               />
                             </div>
@@ -731,8 +736,10 @@ export default function DoctorSignup() {
                                 type="tel"
                                 value={formData.hospitalNumber}
                                 onChange={(e) => handleInputChange('hospitalNumber', e.target.value)}
+                                onKeyDown={handlePhoneKeyDown}
+                                maxLength={10}
                                 className={`pl-9 w-full rounded-lg border-gray-200 focus:border-blue-500 focus:ring-blue-500 py-2 text-sm ${errors.hospitalNumber ? 'border-red-300' : ''}`}
-                                placeholder="Hospital phone number"
+                                placeholder="10-digit hospital phone number"
                                 required
                               />
                             </div>

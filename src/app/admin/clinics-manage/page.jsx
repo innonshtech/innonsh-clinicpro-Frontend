@@ -1,23 +1,34 @@
 'use client';
-import { API_BASE_URL } from '@/utils/api';
-
-import { useState, useEffect } from 'react'
-import { Pencil, Trash2, Plus, Search, ChevronDown, ChevronUp, Filter, X, Eye, Check, XCircle, Building2, Clock, CheckCircle } from 'lucide-react'
+import { API_BASE_URL, getAuthHeaders } from '@/utils/api';
+import { validatePhoneNumber, handlePhoneKeyDown } from '@/utils/phoneValidation';
+import { formatTitleCase } from '@/utils/nameFormatting';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Pencil, Trash2, Plus, Search, ChevronDown, ChevronUp, Filter, X, Eye, Check, XCircle, Building2, Clock, CheckCircle, ExternalLink, FileText, MapPin, Stethoscope } from 'lucide-react';
+import EditClinicModal from './EditClinicModal';
+import ClinicDetailsModal from './ClinicDetailsModal';
+import AdminDoctorDetailsModal from './AdminDoctorDetailsModal';
+import { supabase } from '@/lib/supabase';
 
 export default function ClinicsManage() {
+  const router = useRouter();
   const [clinics, setClinics] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortConfig, setSortConfig] = useState({ key: 'clinicName', direction: 'asc' });
+  const [sortConfig, setSortConfig] = useState({ key: '', direction: 'asc' });
   const [filters, setFilters] = useState({
     status: 'all',
     location: 'all',
     approved: 'all'
   });
   const [showFilters, setShowFilters] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [showAddSuccess, setShowAddSuccess] = useState(false);
+  const [showUpdateSuccess, setShowUpdateSuccess] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [detailsLoading, setDetailsLoading] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [selectedClinic, setSelectedClinic] = useState(null);
   const [showApprovalSuccess, setShowApprovalSuccess] = useState(false);
@@ -25,6 +36,17 @@ export default function ClinicsManage() {
     title: '',
     description: ''
   });
+
+  // Associated Doctors in Clinic Details state (Read-Only)
+  const [clinicDoctors, setClinicDoctors] = useState([]);
+  const [doctorsLoading, setDoctorsLoading] = useState(false);
+  const [selectedDoctorForView, setSelectedDoctorForView] = useState(null);
+
+  // Clinic Delete state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [clinicToDelete, setClinicToDelete] = useState(null);
+  const [isDeletingClinic, setIsDeletingClinic] = useState(false);
+  const [deleteClinicError, setDeleteClinicError] = useState('');
   const [newClinic, setNewClinic] = useState({
     clinicName: '',
     address: '',
@@ -37,38 +59,141 @@ export default function ClinicsManage() {
     specialties: []
   });
 
-  useEffect(() => {
-    const fetchClinics = async () => {
-      try {
-        setLoading(true)
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
-        const token = localStorage.getItem('token') || user.token || '';
-        const res = await fetch(`${API_BASE_URL}/api/v1/clinic/fetch-all-clinics`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
+  const sortClinicsByNewest = (list) => {
+    return [...list].sort((a, b) => {
+      if (a.isNewlyCreated) return -1;
+      if (b.isNewlyCreated) return 1;
+
+      const dateA = new Date(a.created_at || a.createdAt || a.registrationDate || 0).getTime();
+      const dateB = new Date(b.created_at || b.createdAt || b.registrationDate || 0).getTime();
+      if (!isNaN(dateA) && !isNaN(dateB) && dateA !== dateB) {
+        return dateB - dateA;
+      }
+
+      const idA = Number(a._id || a.id);
+      const idB = Number(b._id || b.id);
+      if (!isNaN(idA) && !isNaN(idB) && idA !== idB) {
+        return idB - idA;
+      }
+
+      return 0;
+    });
+  };
+
+  const fetchClinics = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_BASE_URL}/api/v1/clinic/fetch-all-clinics`, {
+        headers: getAuthHeaders()
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to fetch clinics');
+      }
+
+      const responseData = await res.json();
+      if (responseData.success) {
+        let list = responseData.data.clinics || [];
+        if (typeof window !== 'undefined') {
+          const stored = sessionStorage.getItem('newlyCreatedClinic');
+          if (stored) {
+            try {
+              const newClinic = JSON.parse(stored);
+              list = list.filter(c => {
+                const cId = c._id || c.id;
+                const nId = newClinic._id || newClinic.id;
+                if (cId && nId && String(cId) === String(nId)) return false;
+                const cName = c.clinicName || c.clinic_name;
+                const nName = newClinic.clinicName || newClinic.clinic_name;
+                if (cName && nName && cName.toLowerCase().trim() === nName.toLowerCase().trim()) return false;
+                return true;
+              });
+              list = [{ ...newClinic, isNewlyCreated: true }, ...list];
+            } catch (e) {
+              console.error('Error parsing newlyCreatedClinic:', e);
+            }
           }
-        })
+        }
+        setClinics(sortClinicsByNewest(list));
+      } else {
+        throw new Error(responseData.message || 'Failed to fetch clinics');
+      }
+    } catch (err) {
+      console.error('Error:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        if (!res.ok) {
-          throw new Error('Failed to fetch clinics')
+  useEffect(() => {
+    fetchClinics();
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('added') === 'true') {
+        setShowAddSuccess(true);
+
+        const stored = sessionStorage.getItem('newlyCreatedClinic');
+        if (stored) {
+          try {
+            const newClinic = JSON.parse(stored);
+            setClinics(prev => {
+              const filtered = prev.filter(c => {
+                const cId = c._id || c.id;
+                const nId = newClinic._id || newClinic.id;
+                if (cId && nId && String(cId) === String(nId)) return false;
+                const cName = c.clinicName || c.clinic_name;
+                const nName = newClinic.clinicName || newClinic.clinic_name;
+                if (cName && nName && cName.toLowerCase().trim() === nName.toLowerCase().trim()) return false;
+                return true;
+              });
+              return [{ ...newClinic, isNewlyCreated: true }, ...filtered];
+            });
+          } catch (e) {
+            console.error('Error prepending newlyCreatedClinic on added param:', e);
+          }
         }
 
-        const responseData = await res.json()
-        if (responseData.success) {
-          setClinics(responseData.data.clinics || [])
-        } else {
-          throw new Error(responseData.message || 'Failed to fetch clinics')
-        }
-      } catch (err) {
-        console.error('Error:', err)
-        setError(err.message)
-      } finally {
-        setLoading(false)
+        fetchClinics();
+
+        const timer = setTimeout(() => {
+          setShowAddSuccess(false);
+          router.replace('/admin/clinics-manage');
+        }, 5000);
+        return () => clearTimeout(timer);
       }
     }
+  }, [router]);
 
-    fetchClinics()
-  }, [])
+  // Lock outer page scrolling while Clinic Details modal is open and restore when closed
+  useEffect(() => {
+    if (showViewModal || showEditModal) {
+      const originalBodyOverflow = document.body.style.overflow;
+      const originalHtmlOverflow = document.documentElement.style.overflow;
+      const mainContainer = document.querySelector('main');
+      const originalMainOverflow = mainContainer ? mainContainer.style.overflow : '';
+      const originalMainOverflowY = mainContainer ? mainContainer.style.overflowY : '';
+
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      if (mainContainer) {
+        mainContainer.style.overflow = 'hidden';
+        mainContainer.style.overflowY = 'hidden';
+      }
+
+      return () => {
+        document.body.style.overflow = originalBodyOverflow;
+        document.documentElement.style.overflow = originalHtmlOverflow;
+        if (mainContainer) {
+          mainContainer.style.overflow = originalMainOverflow;
+          mainContainer.style.overflowY = originalMainOverflowY;
+        }
+      };
+    }
+  }, [showViewModal, showEditModal]);
 
   const handleSort = (key) => {
     let direction = 'asc';
@@ -79,22 +204,44 @@ export default function ClinicsManage() {
   };
 
   const sortedClinics = [...clinics].sort((a, b) => {
-    const aValue = a[sortConfig.key] || '';
-    const bValue = b[sortConfig.key] || '';
+    if (a.isNewlyCreated) return -1;
+    if (b.isNewlyCreated) return 1;
 
-    if (aValue < bValue) {
-      return sortConfig.direction === 'asc' ? -1 : 1;
+    if (sortConfig.key) {
+      const aValue = a[sortConfig.key] || '';
+      const bValue = b[sortConfig.key] || '';
+
+      if (aValue < bValue) {
+        return sortConfig.direction === 'asc' ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return sortConfig.direction === 'asc' ? 1 : -1;
+      }
     }
-    if (aValue > bValue) {
-      return sortConfig.direction === 'asc' ? 1 : -1;
+
+    const dateA = new Date(a.created_at || a.createdAt || a.registrationDate || 0).getTime();
+    const dateB = new Date(b.created_at || b.createdAt || b.registrationDate || 0).getTime();
+    if (!isNaN(dateA) && !isNaN(dateB) && dateA !== dateB) {
+      return dateB - dateA;
     }
+
+    const idA = Number(a._id || a.id);
+    const idB = Number(b._id || b.id);
+    if (!isNaN(idA) && !isNaN(idB) && idA !== idB) {
+      return idB - idA;
+    }
+
     return 0;
   });
 
   const filteredClinics = sortedClinics.filter(clinic => {
-    const matchesSearch = clinic.clinicName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      clinic.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      clinic.phone.includes(searchTerm);
+    const cName = clinic.clinicName || clinic.clinic_name || '';
+    const cCity = clinic.city || '';
+    const cPhone = clinic.phone || '';
+
+    const matchesSearch = cName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cCity.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cPhone.includes(searchTerm);
 
     const matchesStatus = filters.status === 'all' || clinic.status === filters.status;
     const matchesLocation = filters.location === 'all' || clinic.city === filters.location;
@@ -121,9 +268,10 @@ export default function ClinicsManage() {
         const newClinicWithId = {
           ...newClinic,
           _id: (clinics.length + 1).toString(),
-          registrationDate: new Date().toISOString().split('T')[0]
+          registrationDate: new Date().toISOString().split('T')[0],
+          isNewlyCreated: true
         };
-        setClinics([...clinics, newClinicWithId]);
+        setClinics([newClinicWithId, ...clinics]);
         setShowAddModal(false);
         setNewClinic({
           clinicName: '',
@@ -145,19 +293,205 @@ export default function ClinicsManage() {
     }
   };
 
-  const handleDelete = (id) => {
-    if (window.confirm('Are you sure you want to delete this clinic?')) {
-      setLoading(true);
-      setTimeout(() => {
-        setClinics(clinics.filter(clinic => clinic._id !== id));
-        setLoading(false);
-      }, 500);
+  const handleClinicUpdated = (updatedClinic) => {
+    const clinicId = updatedClinic._id || updatedClinic.id;
+    setSelectedClinic(prev => ({
+      ...(prev || {}),
+      ...updatedClinic
+    }));
+    setClinics(prev => prev.map(c => {
+      const cId = c._id || c.id;
+      if (cId === clinicId) {
+        return {
+          ...c,
+          ...updatedClinic
+        };
+      }
+      return c;
+    }));
+    setShowUpdateSuccess(true);
+  };
+
+  // Fetch doctors belonging exclusively to a specific clinic
+  const fetchDoctorsForClinic = async (clinicId) => {
+    if (!clinicId) {
+      setClinicDoctors([]);
+      return;
+    }
+    try {
+      setDoctorsLoading(true);
+      // 1. Try backend/API endpoint
+      const res = await fetch(`${API_BASE_URL}/api/v1/clinic/fetch-doctor-clinicId/${clinicId}`, {
+        headers: getAuthHeaders()
+      }).catch(() => null);
+
+      if (res && res.ok) {
+        const responseData = await res.json().catch(() => ({}));
+        if (responseData.success && Array.isArray(responseData.data?.doctors)) {
+          setClinicDoctors(responseData.data.doctors);
+          return;
+        }
+      }
+
+      // 2. Direct Supabase query fallback
+      const { data, error: sbErr } = await supabase
+        .from('doctors')
+        .select('*')
+        .eq('clinic_id', clinicId);
+
+      if (!sbErr && Array.isArray(data)) {
+        setClinicDoctors(data);
+      } else {
+        setClinicDoctors([]);
+      }
+    } catch (err) {
+      console.warn('Error fetching doctors for clinic:', err);
+      try {
+        const { data } = await supabase.from('doctors').select('*').eq('clinic_id', clinicId);
+        setClinicDoctors(Array.isArray(data) ? data : []);
+      } catch (_) {
+        setClinicDoctors([]);
+      }
+    } finally {
+      setDoctorsLoading(false);
     }
   };
 
-  const handleViewClinic = (clinic) => {
+  const openDeleteModal = (clinic) => {
+    setClinicToDelete(clinic);
+    setDeleteClinicError('');
+    setShowDeleteModal(true);
+  };
+
+  const closeDeleteModal = () => {
+    if (isDeletingClinic) return;
+    setShowDeleteModal(false);
+    setClinicToDelete(null);
+    setDeleteClinicError('');
+  };
+
+  const handleConfirmDeleteClinic = async () => {
+    if (!clinicToDelete) return;
+    const clinicId = clinicToDelete._id || clinicToDelete.id;
+    if (!clinicId) return;
+
+    try {
+      setIsDeletingClinic(true);
+      setDeleteClinicError('');
+
+      // 1. Call API endpoint
+      let res = await fetch(`${API_BASE_URL}/api/v1/clinic/delete/${clinicId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders()
+        }
+      }).catch(() => null);
+
+      let data = res ? await res.json().catch(() => ({})) : null;
+
+      // 2. If endpoint not found or failed, try local Next.js route
+      if (!res || !res.ok) {
+        if (!data || res?.status === 404 || res?.status === 502) {
+          const localRes = await fetch(`/api/v1/clinic/delete/${clinicId}`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+              ...getAuthHeaders()
+            }
+          }).catch(() => null);
+          if (localRes) {
+            res = localRes;
+            data = await localRes.json().catch(() => ({}));
+          }
+        }
+      }
+
+      // 3. Fallback client-side dependency check & direct deletion if API route unreachable
+      if (!res || !data) {
+        const [docs, patients, appts, orders] = await Promise.all([
+          supabase.from('doctors').select('id', { count: 'exact', head: true }).eq('clinic_id', clinicId),
+          supabase.from('patients').select('id', { count: 'exact', head: true }).eq('clinic_id', clinicId),
+          supabase.from('appointments').select('id', { count: 'exact', head: true }).eq('clinic_id', clinicId),
+          supabase.from('lab_orders').select('id', { count: 'exact', head: true }).eq('clinic_id', clinicId)
+        ]);
+
+        const reasons = [];
+        if (docs.count > 0) reasons.push(`${docs.count} assigned doctor(s)`);
+        if (patients.count > 0) reasons.push(`${patients.count} patient record(s)`);
+        if (appts.count > 0) reasons.push(`${appts.count} appointment(s)`);
+        if (orders.count > 0) reasons.push(`${orders.count} lab order(s)`);
+
+        if (reasons.length > 0) {
+          setDeleteClinicError(`Cannot delete clinic because it has associated ${reasons.join(', ')}. Please reassign or remove these records first.`);
+          setIsDeletingClinic(false);
+          return;
+        }
+
+        const { error: sbDeleteErr } = await supabase.from('clinics').delete().eq('id', clinicId);
+        if (sbDeleteErr) {
+          throw new Error(sbDeleteErr.message || 'Failed to delete clinic');
+        }
+        data = { success: true };
+      }
+
+      if (data && data.success === false) {
+        setDeleteClinicError(data.message || data.error || 'Cannot delete clinic due to dependencies.');
+        return;
+      }
+
+      // Remove from session storage if newly created
+      if (typeof window !== 'undefined') {
+        const stored = sessionStorage.getItem('newlyCreatedClinic');
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            if (String(parsed.id || parsed._id) === String(clinicId)) {
+              sessionStorage.removeItem('newlyCreatedClinic');
+            }
+          } catch (_) {}
+        }
+      }
+
+      setShowDeleteModal(false);
+      setClinicToDelete(null);
+      await fetchClinics();
+    } catch (err) {
+      console.error('Delete clinic error:', err);
+      setDeleteClinicError(err.message || 'An unexpected error occurred while deleting the clinic.');
+    } finally {
+      setIsDeletingClinic(false);
+    }
+  };
+
+  const handleViewClinic = async (clinic) => {
     setSelectedClinic(clinic);
+    setClinicDoctors([]);
     setShowViewModal(true);
+
+    const clinicId = clinic.id || clinic._id;
+    if (clinicId) {
+      fetchDoctorsForClinic(clinicId);
+      try {
+        setDetailsLoading(true);
+        const res = await fetch(`${API_BASE_URL}/api/v1/clinic/fetch-by-id/${clinicId}`, {
+          headers: getAuthHeaders()
+        });
+        if (res.ok) {
+          const responseData = await res.json();
+          if (responseData.success && responseData.data?.clinic) {
+            setSelectedClinic(prev => ({
+              ...prev,
+              ...responseData.data.clinic
+            }));
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching clinic details:', err);
+      } finally {
+        setDetailsLoading(false);
+      }
+    }
   };
 
   // const handleApproveClinic = (id) => {
@@ -280,17 +614,60 @@ export default function ClinicsManage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Clinic Management</h1>
-          <p className="text-sm text-gray-500">Manage all affiliated clinics and their details</p>
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
+              <Building2 className="h-6 w-6" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 leading-tight">Clinic Management</h1>
+              <p className="text-sm text-gray-500">Manage all affiliated clinics and their details</p>
+            </div>
+          </div>
         </div>
-        {/* <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center justify-center px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all shadow-md hover:shadow-lg"
+        <Link
+          href="/admin/clinics/add"
+          className="flex items-center justify-center px-4 py-2 bg-gradient-to-r from-teal-600 to-cyan-600 text-white rounded-lg hover:from-teal-700 hover:to-cyan-700 transition-all shadow-md hover:shadow-lg"
         >
           <Plus className="h-4 w-4 mr-2" />
-          Add Clinic
-        </button> */}
+          Add New Clinic
+        </Link>
       </div>
+
+      {/* Add Clinic Success Message */}
+      {showAddSuccess && (
+        <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-lg flex items-center justify-between shadow-sm animate-in fade-in duration-200">
+          <div className="flex items-center">
+            <CheckCircle className="h-5 w-5 text-emerald-600 mr-3 flex-shrink-0" />
+            <p className="text-sm font-medium text-emerald-800">
+              New clinic has been successfully created and approved!
+            </p>
+          </div>
+          <button
+            onClick={() => setShowAddSuccess(false)}
+            className="text-emerald-600 hover:text-emerald-800 p-1"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Update Clinic Success Message */}
+      {showUpdateSuccess && (
+        <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-lg flex items-center justify-between shadow-sm animate-in fade-in duration-200">
+          <div className="flex items-center">
+            <CheckCircle className="h-5 w-5 text-emerald-600 mr-3 flex-shrink-0" />
+            <p className="text-sm font-medium text-emerald-800">
+              Clinic details updated successfully!
+            </p>
+          </div>
+          <button
+            onClick={() => setShowUpdateSuccess(false)}
+            className="text-emerald-600 hover:text-emerald-800 p-1"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Error Message */}
       {error && (
@@ -562,15 +939,32 @@ export default function ClinicsManage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredClinics.length > 0 ? (
-                  filteredClinics.map((clinic) => (
-                    <tr key={clinic._id} className="hover:bg-gray-50 transition-colors">
+                  filteredClinics.map((clinic, index) => (
+                    <tr key={clinic._id || clinic.id || index} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10 rounded-full bg-gradient-to-r from-indigo-100 to-purple-100 flex items-center justify-center">
-                            <span className="text-indigo-600 font-medium">{clinic.clinicName.charAt(0)}</span>
-                          </div>
+                          {(() => {
+                            const clinicLogo = clinic?.logo || clinic?.logo_url || clinic?.logoUrl;
+                            const formattedClinicName = formatTitleCase(clinic?.clinicName || clinic?.clinic_name || 'Clinic');
+                            const initial = (formattedClinicName || 'C').charAt(0).toUpperCase();
+                            return (
+                              <div className="flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center">
+                                {clinicLogo ? (
+                                  <img
+                                    src={clinicLogo}
+                                    alt={formattedClinicName}
+                                    className="h-10 w-10 rounded-full object-cover border border-indigo-200 shadow-xs"
+                                  />
+                                ) : (
+                                  <div className="h-10 w-10 rounded-full bg-gradient-to-r from-indigo-100 to-purple-100 flex items-center justify-center border border-indigo-200 shadow-xs">
+                                    <span className="text-indigo-600 font-medium">{initial}</span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                           <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">{clinic.clinicName}</div>
+                            <div className="text-sm font-medium text-gray-900">{formatTitleCase(clinic.clinicName || clinic.clinic_name)}</div>
                             <div className="text-sm text-gray-500">{clinic.address}</div>
                           </div>
                         </div>
@@ -583,7 +977,7 @@ export default function ClinicsManage() {
                         <div className="text-sm text-gray-500">{clinic.email}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900 capitalize">{clinic.clinicType}</div>
+                        <div className="text-sm text-gray-900 capitalize">{clinic.clinicType || clinic.clinic_type}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClasses[clinic.status] || 'bg-gray-100 text-gray-800'}`}>
@@ -621,7 +1015,7 @@ export default function ClinicsManage() {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex space-x-3">
+                        <div className="flex space-x-2">
                           <button
                             onClick={() => handleViewClinic(clinic)}
                             className="text-indigo-600 hover:text-indigo-900 p-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
@@ -630,9 +1024,19 @@ export default function ClinicsManage() {
                             <Eye className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => handleDelete(clinic._id)}
+                            onClick={() => {
+                              setSelectedClinic(clinic);
+                              setShowEditModal(true);
+                            }}
+                            className="text-blue-600 hover:text-blue-900 p-1.5 rounded-lg hover:bg-blue-50 transition-colors"
+                            title="Edit clinic"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => openDeleteModal(clinic)}
                             className="text-rose-600 hover:text-rose-900 p-1.5 rounded-lg hover:bg-rose-50 transition-colors"
-                            title="Delete"
+                            title="Delete clinic"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -653,260 +1057,107 @@ export default function ClinicsManage() {
         )}
       </div>
 
-      {/* Add Clinic Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Add New Clinic</h2>
-                <button
-                  onClick={() => setShowAddModal(false)}
-                  className="text-gray-400 hover:text-gray-500 transition-colors p-1 rounded-full hover:bg-gray-100"
-                >
-                  <X className="h-6 w-6" />
-                </button>
-              </div>
 
-              <form onSubmit={handleAddClinic} className="space-y-4">
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Clinic Name</label>
-                    <input
-                      type="text"
-                      value={newClinic.clinicName}
-                      onChange={(e) => setNewClinic({ ...newClinic, clinicName: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                      required
-                      placeholder="Enter clinic name"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-                      <input
-                        type="text"
-                        value={newClinic.city}
-                        onChange={(e) => setNewClinic({ ...newClinic, city: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        required
-                        placeholder="Enter city"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                      <input
-                        type="tel"
-                        value={newClinic.phone}
-                        onChange={(e) => setNewClinic({ ...newClinic, phone: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        required
-                        placeholder="Enter phone number"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-                    <input
-                      type="text"
-                      value={newClinic.address}
-                      onChange={(e) => setNewClinic({ ...newClinic, address: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                      required
-                      placeholder="Enter full address"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                      <input
-                        type="email"
-                        value={newClinic.email}
-                        onChange={(e) => setNewClinic({ ...newClinic, email: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        required
-                        placeholder="Enter email"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Clinic Type</label>
-                      <input
-                        type="text"
-                        value={newClinic.clinicType}
-                        onChange={(e) => setNewClinic({ ...newClinic, clinicType: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        placeholder="Enter clinic type"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6 flex justify-end space-x-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddModal(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg text-sm font-medium text-white hover:from-indigo-700 hover:to-purple-700 transition-all shadow-md"
-                    disabled={loading}
-                  >
-                    {loading ? 'Adding...' : 'Add Clinic'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* View Clinic Modal */}
       {showViewModal && selectedClinic && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Clinic Details</h2>
-                <button
-                  onClick={() => setShowViewModal(false)}
-                  className="text-gray-400 hover:text-gray-500 transition-colors p-1 rounded-full hover:bg-gray-100"
-                >
-                  <X className="h-6 w-6" />
-                </button>
+        <ClinicDetailsModal
+          isOpen={showViewModal}
+          clinic={selectedClinic}
+          onClose={() => setShowViewModal(false)}
+          onEditClinic={(clinic) => {
+            setSelectedClinic(clinic);
+            setShowEditModal(true);
+          }}
+          onApproveClinic={handleApproveClinic}
+          isApproving={loading}
+        />
+      )}
+
+      {/* Edit Clinic Modal */}
+      {showEditModal && selectedClinic && (
+        <EditClinicModal
+          isOpen={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          clinic={selectedClinic}
+          onClinicUpdated={handleClinicUpdated}
+        />
+      )}
+
+      {/* Delete Clinic Confirmation Modal */}
+      {showDeleteModal && clinicToDelete && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-100 relative animate-in zoom-in-95 duration-150">
+            <button
+              onClick={closeDeleteModal}
+              disabled={isDeletingClinic}
+              className="absolute top-4 right-4 p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+              title="Close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="flex items-center gap-3.5 mb-4">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-rose-100 text-rose-600">
+                <Trash2 className="h-6 w-6" />
               </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">
+                  Delete Clinic?
+                </h3>
+                <p className="text-xs text-gray-500">
+                  Permanent deletion confirmation
+                </p>
+              </div>
+            </div>
 
-              <div className="space-y-6">
-                {/* Header with basic info */}
-                <div className="flex flex-col md:flex-row gap-6">
-                  <div className="flex-shrink-0">
-                    <div className="h-16 w-16 rounded-full bg-gradient-to-r from-indigo-100 to-purple-100 flex items-center justify-center">
-                      <span className="text-indigo-600 text-xl font-bold">{selectedClinic.clinicName.charAt(0)}</span>
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-xl font-semibold text-gray-900">{selectedClinic.clinicName}</h3>
-                    <div className="mt-1 flex items-center">
-                      <span className={`px-2.5 py-0.5 text-xs font-medium rounded-full ${statusClasses[selectedClinic.status]}`}>
-                        {selectedClinic.status?.charAt(0).toUpperCase() + selectedClinic.status?.slice(1) || 'Unknown'}
-                      </span>
-                      {selectedClinic.approved && (
-                        <span className="ml-2 px-2.5 py-0.5 text-xs font-medium rounded-full bg-emerald-100 text-emerald-800">
-                          Approved
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-2 text-sm text-gray-500">{selectedClinic.address}, {selectedClinic.city}</p>
-                  </div>
-                </div>
+            <p className="text-sm text-gray-600 leading-relaxed mb-4">
+              Are you sure you want to delete <strong className="text-gray-900">{formatTitleCase(clinicToDelete.clinicName || clinicToDelete.clinic_name || 'this clinic')}</strong>? This action cannot be undone.
+            </p>
 
-                {/* Details grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-500">Contact Information</h4>
-                      <div className="mt-2 space-y-1">
-                        <p className="text-sm text-gray-900">{selectedClinic.phone}</p>
-                        <p className="text-sm text-gray-900">{selectedClinic.email}</p>
-                      </div>
-                    </div>
-
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-500">Clinic Type</h4>
-                      <p className="mt-2 text-sm text-gray-900 capitalize">{selectedClinic.clinicType}</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-500">Registration Date</h4>
-                      <p className="mt-2 text-sm text-gray-900">{selectedClinic.createdAt}</p>
-                    </div>
-
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-500">Specialties</h4>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {selectedClinic.specialties.length > 0 ? (
-                          selectedClinic.specialties.map((specialty, index) => (
-                            <span key={index} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                              {specialty}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-sm text-gray-500">No specialties listed</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Documents section */}
-                <div className="border-t border-gray-200 pt-6">
-                  <h4 className="text-sm font-medium text-gray-500">Documents</h4>
-                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="border border-gray-200 rounded-lg p-4">
-                      <h5 className="text-xs font-medium text-gray-500 mb-2">License Document</h5>
-                      {selectedClinic.licenseDocumentUrl ? (
-                        <img
-                          src={selectedClinic.licenseDocumentUrl}
-                          alt="License document"
-                          className="w-full h-auto rounded border border-gray-200"
-                        />
-                      ) : (
-                        <div className="text-sm text-gray-500">No license document uploaded</div>
-                      )}
-                    </div>
-                    <div className="border border-gray-200 rounded-lg p-4">
-                      <h5 className="text-xs font-medium text-gray-500 mb-2">GST Document</h5>
-                      {selectedClinic.gstDocumentUrl ? (
-                        <img
-                          src={selectedClinic.gstDocumentUrl}
-                          alt="GST document"
-                          className="w-full h-auto rounded border border-gray-200"
-                        />
-                      ) : (
-                        <div className="text-sm text-gray-500">No GST document uploaded</div>
-                      )}
-                    </div>
-                  </div>
+            {deleteClinicError && (
+              <div className="mb-4 p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-start gap-2.5">
+                <XCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <div className="flex-1 font-medium leading-relaxed">
+                  {deleteClinicError}
                 </div>
               </div>
+            )}
 
-              <div className="mt-8 flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => setShowViewModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Close
-                </button>
-                {!selectedClinic.approved && selectedClinic.status === 'pending' && (
-                  <button
-                    type="button"
-                    onClick={() => handleApproveClinic(selectedClinic._id)}
-                    className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 rounded-lg text-sm font-medium text-white hover:from-emerald-700 hover:to-green-700 transition-all shadow-md"
-                    disabled={loading}
-                  >
-                    {loading ? 'Approving...' : 'Approve Clinic'}
-                  </button>
+            <div className="flex items-center justify-end gap-3 mt-6 pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={closeDeleteModal}
+                disabled={isDeletingClinic}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors shadow-xs disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteClinic}
+                disabled={isDeletingClinic}
+                className="px-4 py-2 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white rounded-lg text-sm font-semibold transition-all shadow-md flex items-center gap-2 disabled:opacity-70 cursor-pointer"
+              >
+                {isDeletingClinic ? (
+                  <>
+                    <Clock className="w-4 h-4 animate-spin" />
+                    Deleting Clinic...
+                  </>
+                ) : (
+                  'Delete Clinic'
                 )}
-              </div>
+              </button>
             </div>
           </div>
         </div>
       )}
 
+
       {/* Reject Clinic Modal */}
       {showRejectModal && selectedClinic && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[92vh] overflow-y-auto flex flex-col">
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-900">Reject Clinic</h2>
@@ -929,7 +1180,7 @@ export default function ClinicsManage() {
                     </div>
                     <div className="ml-3">
                       <p className="text-sm text-rose-700">
-                        You are about to reject <span className="font-semibold">{selectedClinic.clinicName}</span>.
+                        You are about to reject <span className="font-semibold">{formatTitleCase(selectedClinic.clinicName || selectedClinic.clinic_name)}</span>.
                         Please provide a reason for rejection.
                       </p>
                     </div>

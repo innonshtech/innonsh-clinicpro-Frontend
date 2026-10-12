@@ -4,8 +4,9 @@ import { useDoctor } from '@/context/DoctorContext';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { ROLES } from '@/constants/roles';
+import { API_BASE_URL, getAuthHeaders } from '@/utils/api';
 import { 
-  Stethoscope, Calendar, Users, Activity, Settings, Search, Menu, X, User, LogOut, ChevronDown, Clock, FileText
+  Stethoscope, Calendar, Users, Activity, Settings, Search, Menu, X, User, LogOut, ChevronDown, Clock, FileText, FlaskConical, BedDouble
 } from 'lucide-react';
 
 export default function ClinicDashboardLayout({ children }) {
@@ -14,7 +15,32 @@ export default function ClinicDashboardLayout({ children }) {
   const [userData, setUserData] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [isLabEnabled, setIsLabEnabled] = useState(true);
+  const [isIpdEnabled, setIsIpdEnabled] = useState(false);
   const pathname = usePathname();
+
+  const fetchClinicModules = async (cId) => {
+    if (!cId) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/clinic/fetchProfileData/${cId}`, {
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      const clinic = data?.data?.clinic;
+      if (clinic?.modules?.lab === false) {
+        setIsLabEnabled(false);
+      } else {
+        setIsLabEnabled(true);
+      }
+      if (clinic?.modules?.ipd === true) {
+        setIsIpdEnabled(true);
+      } else {
+        setIsIpdEnabled(false);
+      }
+    } catch (error) {
+      console.error('Error fetching clinic modules:', error);
+    }
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -30,6 +56,22 @@ export default function ClinicDashboardLayout({ children }) {
       setUserData(user);
       if (user.role !== ROLES.DOCTOR) {
         router.push('/login');
+        return;
+      }
+
+      let cId = user.clinicId || user.clinic_id || user.clinic?.id;
+      if (!cId && token) {
+        try {
+          const parts = token.split('.');
+          if (parts.length === 3) {
+            const payload = JSON.parse(atob(parts[1]));
+            cId = payload.clinicId || payload.clinic_id;
+          }
+        } catch (_) {}
+      }
+
+      if (cId) {
+        fetchClinicModules(cId);
       }
     } catch (error) {
       console.error('Invalid user data in localStorage');
@@ -37,17 +79,25 @@ export default function ClinicDashboardLayout({ children }) {
     }
   }, []);
 
+  useEffect(() => {
+    if (doctor?.clinicId && !isIpdEnabled) {
+      fetchClinicModules(doctor.clinicId);
+    }
+  }, [doctor?.clinicId]);
+
   const sidebarItems = [
     { icon: Activity, label: 'Dashboard', href: '/doctor-dashboard', id: 'overview' },
     { icon: Calendar, label: 'Appointments', href: '/doctor-dashboard/appointments', id: 'appointments' },
     { icon: Users, label: 'Patients', href: '/doctor-dashboard/patients', id: 'patients' },
+    ...(isIpdEnabled ? [{ icon: BedDouble, label: 'IPD / Inpatients', href: '/doctor-dashboard/ipd', id: 'ipd' }] : []),
+    ...(isLabEnabled ? [{ icon: FlaskConical, label: 'Lab Orders', href: '/doctor-dashboard/lab-orders', id: 'lab-orders' }] : []),
     { icon: Calendar, label: 'Manage Leave', href: '/doctor-dashboard/leave', id: 'leave' },
     // { icon: FileText, label: 'Medical Records', href: '/doctor-dashboard/records', id: 'records' },
     { icon: Settings, label: 'Profile', href: '/doctor-dashboard/profile', id: 'profile' },
   ];
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] relative overflow-hidden text-slate-800">
+    <div className="min-h-screen bg-[#f8fafc] relative text-slate-800 overflow-x-clip">
 
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
@@ -70,7 +120,7 @@ export default function ClinicDashboardLayout({ children }) {
         <nav className="mt-8 px-4">
           {sidebarItems.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href;
+            const isActive = pathname === item.href || (item.href !== '/doctor-dashboard' && pathname.startsWith(item.href));
             return (
               <Link
                 key={item.label}
@@ -92,7 +142,7 @@ export default function ClinicDashboardLayout({ children }) {
 
       {/* Main content */}
       <div className="lg:ml-72 flex-1 flex flex-col min-h-screen">
-        <header className="sticky top-0 z-30 bg-white border-b border-slate-100">
+        <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between h-16 px-8">
             <div className="flex items-center flex-1">
               <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2.5 rounded-xl text-slate-600 hover:bg-slate-100 transition-colors mr-4">
@@ -154,7 +204,7 @@ export default function ClinicDashboardLayout({ children }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-x-hidden overflow-y-auto p-6 lg:p-8 relative z-10">{children}</main>
+        <main className="flex-1 p-6 lg:p-8 relative">{children}</main>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 'use client';
 import { API_BASE_URL } from '@/utils/api';
 import { useEffect, useState } from 'react';
+import { validatePhoneNumber, handlePhoneKeyDown } from '@/utils/phoneValidation';
 import { FiCalendar, FiPlus, FiX, FiClock, FiUser, FiMapPin, FiPhone, FiMail, FiInfo,FiAlertCircle, FiCheckCircle } from 'react-icons/fi';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
@@ -289,11 +290,11 @@ useEffect(() => {
         <>
           <div className="fixed inset-0 bg-black/50 backdrop-blur-md z-40 animate-in fade-in duration-300"></div>
           
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in zoom-in-95 duration-300">
-            <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-2xl max-h-[90vh] overflow-hidden transform transition-all">
+          <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 animate-in zoom-in-95 duration-300">
+            <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden transform transition-all">
               
               {/* Enhanced header with gradient and glass effect */}
-              <div className={`relative px-8 py-6 ${
+              <div className={`relative px-8 py-6 shrink-0 ${
                 selectedAppointment.status === 'completed' 
                   ? 'bg-gradient-to-br from-emerald-500 via-green-500 to-teal-500' 
                   : 'bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500'
@@ -330,7 +331,7 @@ useEffect(() => {
               </div>
 
               {/* Enhanced content area */}
-              <div className="p-8 space-y-8 overflow-y-auto max-h-[calc(90vh-200px)]">
+              <div className="p-6 sm:p-8 space-y-6 sm:space-y-8 overflow-y-auto flex-1">
                 
                 {/* Doctor info card with modern design */}
                 <div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-2xl p-6 border border-gray-100">
@@ -482,10 +483,10 @@ useEffect(() => {
         <>
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity duration-300"></div>
           
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto transform transition-all duration-300 scale-100 opacity-100">
+          <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden transform transition-all duration-300 scale-100 opacity-100 border border-gray-100">
               {/* Modal Header */}
-              <div className="bg-gradient-to-r from-blue-700 to-blue-600 px-8 py-5 rounded-t-xl flex justify-between items-center shadow-md">
+              <div className="bg-gradient-to-r from-blue-700 to-blue-600 px-8 py-5 rounded-t-xl flex justify-between items-center shadow-md shrink-0">
                 <div>
                   <h2 className="text-2xl font-bold text-white">Schedule New Appointment</h2>
                   <p className="text-blue-100 text-sm mt-1">Fill in the details to book your appointment</p>
@@ -499,7 +500,7 @@ useEffect(() => {
               </div>
 
               {/* Modal Body */}
-              <form onSubmit={handleSubmit} className="p-8 space-y-6">
+              <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-6 overflow-y-auto flex-1">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Doctor Name */}
                   <div className="space-y-2">
@@ -647,8 +648,10 @@ useEffect(() => {
                         name="phone"
                         value={newAppointment.phone}
                         onChange={handleInputChange}
+                        onKeyDown={handlePhoneKeyDown}
+                        maxLength={10}
                         className="block w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:border-blue-500 focus:ring-blue-200 transition-all"
-                        placeholder="(123) 456-7890"
+                        placeholder="10-digit mobile number"
                       />
                       <FiPhone className="absolute left-3 top-3.5 text-gray-400" />
                     </div>

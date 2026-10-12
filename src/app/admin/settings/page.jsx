@@ -1,5 +1,6 @@
 'use client';
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react';
+import { validatePhoneNumber, handlePhoneKeyDown } from '@/utils/phoneValidation';
 import { 
   User,
   Bell,
@@ -202,6 +203,9 @@ export default function SettingsPage() {
               type="tel"
               value={profileData.phone}
               onChange={(e) => handleProfileUpdate('phone', e.target.value)}
+              onKeyDown={handlePhoneKeyDown}
+              maxLength={10}
+              placeholder="10-digit phone number"
               className="w-full px-3 py-2 bg-gray-50/50 border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
             />
           </div>

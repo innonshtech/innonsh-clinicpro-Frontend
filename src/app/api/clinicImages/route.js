@@ -31,7 +31,10 @@ export async function POST(request) {
 
     const result = await new Promise((resolve, reject) => {
       cloudinary.uploader.upload_stream(
-        { folder: 'clinic-images' },
+        { 
+          folder: 'clinic-images',
+          resource_type: 'auto'
+        },
         (error, result) => {
           if (error) {
             reject(error);
@@ -43,7 +46,7 @@ export async function POST(request) {
     });
 
     return Response.json({
-      url: result.secure_url,
+      url: result.secure_url || result.url,
       public_id: result.public_id,
       width: result.width,
       height: result.height,

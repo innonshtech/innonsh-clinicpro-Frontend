@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '@/utils/api';
+import { validatePhoneNumber, handlePhoneKeyDown } from '@/utils/phoneValidation';
 import { 
   User, Mail, Phone, Edit, Save, X, Building
 } from 'lucide-react';
@@ -193,9 +194,12 @@ export default function ReceptionistProfilePage() {
             <label className="text-xs text-slate-400 font-bold flex items-center gap-1"><Phone size={12} /> Phone</label>
             {isEditing ? (
               <input 
-                type="text" 
+                type="tel" 
                 value={staffData.phone || ''} 
                 onChange={(e) => setStaffData({...staffData, phone: e.target.value})}
+                onKeyDown={handlePhoneKeyDown}
+                maxLength={10}
+                placeholder="10-digit phone number"
                 className="w-full mt-1 p-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
               />
             ) : (
