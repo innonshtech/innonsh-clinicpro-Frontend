@@ -293,7 +293,7 @@ export default function PatientsPage() {
         <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
           {selectedPatient && (
-            <Dialog.Panel className="bg-white max-w-5xl w-full shadow-2xl grid grid-cols-1 md:grid-cols-4 overflow-hidden rounded-2xl h-[80vh]">
+            <Dialog.Panel className="bg-white max-w-5xl w-full shadow-2xl grid grid-cols-1 md:grid-cols-4 overflow-hidden rounded-2xl max-h-[92vh] h-[85vh]">
               <aside className="bg-gradient-to-br from-blue-600 to-blue-700 text-white p-6 space-y-6 overflow-y-auto">
                 <div className="flex justify-between items-center mb-6">
                   <div>
@@ -340,7 +340,7 @@ export default function PatientsPage() {
                 </nav>
               </aside>
 
-              <main className="col-span-3 p-8 bg-white overflow-y-auto">
+              <main className="col-span-1 md:col-span-3 p-8 bg-white overflow-y-auto">
                 <div className="max-w-3xl mx-auto">
                   {modalSection === "Personal Info" && (
                     <section className="space-y-6">

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { ROLES } from '@/constants/roles';
+import { API_BASE_URL, getAuthHeaders } from '@/utils/api';
 import { 
   LayoutDashboard, 
   Users, 
@@ -18,7 +19,11 @@ import {
   ChevronDown,
   Building2,
   Stethoscope,
-  User
+  User,
+  FlaskConical,
+  HeartPulse,
+  BedDouble,
+  ClipboardList
 } from 'lucide-react';
 
 export default function ClinicLayout({ children }) {
@@ -43,6 +48,22 @@ export default function ClinicLayout({ children }) {
       setClinicData(user);
       if (user.role !== ROLES.CLINIC) {
         router.push('/login');
+        return;
+      }
+
+      // Refresh clinic profile to get active modules
+      const clinicId = user.id || user._id;
+      if (clinicId) {
+        fetch(`${API_BASE_URL}/api/v1/clinic/fetchProfileData/${clinicId}`, {
+          headers: getAuthHeaders()
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data?.data?.clinic) {
+              setClinicData(prev => ({ ...prev, ...data.data.clinic }));
+            }
+          })
+          .catch(err => console.error('Failed to refresh clinic profile:', err));
       }
     } catch (error) {
       console.error('Invalid user data in localStorage');
@@ -50,16 +71,25 @@ export default function ClinicLayout({ children }) {
     }
   }, []);
 
+  const isLabEnabled = clinicData?.modules ? clinicData.modules.lab !== false : true;
+  const isIpdEnabled = clinicData?.modules ? clinicData.modules.ipd === true : false;
+
   const sidebarItems = [
     { icon: LayoutDashboard, label: 'Dashboard', href: '/clinic', id: 'dashboard' },
     { icon: Users, label: 'Doctors', href: '/clinic/doctors', id: 'doctors' },
     { icon: UserPlus, label: 'Receptionists', href: '/clinic/receptionists', id: 'receptionists' },
+    ...(isIpdEnabled ? [
+      { icon: ClipboardList, label: 'IPD / Inpatients', href: '/clinic/ipd', id: 'ipd' },
+      { icon: BedDouble, label: 'Bed Management', href: '/clinic/beds', id: 'beds' },
+      { icon: HeartPulse, label: 'Nurse Management', href: '/clinic/nurses', id: 'nurses' }
+    ] : []),
     { icon: User, label: 'Patients', href: '/clinic/patients', id: 'patients' },
+    ...(isLabEnabled ? [{ icon: FlaskConical, label: 'Lab Orders', href: '/clinic/lab-orders', id: 'lab-orders' }] : []),
     { icon: Settings, label: 'Settings', href: '/clinic/settings', id: 'settings' }
   ];
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] relative overflow-hidden text-slate-800">
+    <div className="min-h-screen bg-[#f8fafc] relative text-slate-800 overflow-x-clip">
 
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
@@ -160,7 +190,7 @@ export default function ClinicLayout({ children }) {
       {/* Main content */}
       <div className="lg:ml-64 flex-1 flex flex-col min-h-screen">
         {/* Top navbar */}
-        <header className="sticky top-0 z-30 bg-white border-b border-slate-100">
+        <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between h-16 px-8">
             <div className="flex items-center flex-1">
               <button
@@ -221,7 +251,7 @@ export default function ClinicLayout({ children }) {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-x-hidden overflow-y-auto p-6 lg:p-8 relative z-10">
+        <main className="flex-1 p-6 lg:p-8 relative">
           {children}
         </main>
       </div>

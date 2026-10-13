@@ -128,22 +128,33 @@ useEffect(()=>{
     }));
   };
 
+  const uploadFileToCloudinary = async (file, folder = 'clinic-logos') => {
+    const uploadData = new FormData();
+    uploadData.append('file', file);
+    uploadData.append('folder', folder);
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      body: uploadData,
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.url) {
+      throw new Error(json.error || 'Failed to upload file.');
+    }
+    return json.url;
+  };
+
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     try {
       setIsSubmitting(true);
-      // Simulate upload
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData(prev => ({ ...prev, logo: reader.result }));
-      };
-      reader.readAsDataURL(file);
+      const uploadedUrl = await uploadFileToCloudinary(file, 'clinic-logos');
+      setFormData(prev => ({ ...prev, logo: uploadedUrl }));
       toast.success('Logo uploaded successfully!');
     } catch (error) {
-      toast.error('Failed to upload logo');
+      console.error('Logo upload error:', error);
+      toast.error(error.message || 'Failed to upload logo');
     } finally {
       setIsSubmitting(false);
     }
@@ -194,12 +205,64 @@ useEffect(()=>{
     setIsSubmitting(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const userStr = localStorage.getItem('user');
+      const userdata = JSON.parse(userStr || '{}');
+      const clinicId = userdata?.id || userdata?.clinicId || userdata?._id;
+      const token = localStorage.getItem('token');
+
+      if (!clinicId) {
+        throw new Error('Clinic ID not found. Please log in again.');
+      }
+
+      const payload = {
+        clinicName: formData.clinicName,
+        clinicType: formData.clinicType,
+        description: formData.description,
+        registrationNumber: formData.registrationNumber,
+        taxId: formData.taxId,
+        specialties: formData.specialties,
+        logo: formData.logo,
+        website: formData.website,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        city: formData.city,
+        state: formData.state,
+        postalCode: formData.postalCode,
+        country: formData.country,
+        openingHours: formData.openingHours
+      };
+
+      const res = await fetch(`${API_BASE_URL}/api/v1/clinic/update-by-id/${clinicId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const resJson = await res.json().catch(() => ({}));
+
+      if (!res.ok || resJson.success === false) {
+        throw new Error(resJson.message || `Failed to update clinic settings (HTTP ${res.status})`);
+      }
+
+      // Update user in localStorage if clinicName or logo changed
+      if (userdata) {
+        userdata.name = formData.clinicName;
+        userdata.clinicName = formData.clinicName;
+        if (formData.logo) {
+          userdata.logo = formData.logo;
+        }
+        localStorage.setItem('user', JSON.stringify(userdata));
+      }
+
       toast.success('Clinic settings updated successfully!');
+      await fetchUserData(clinicId);
     } catch (error) {
       console.error('Update error:', error);
-      toast.error('Failed to update clinic settings');
+      toast.error(error.message || 'Failed to update clinic settings');
     } finally {
       setIsSubmitting(false);
     }

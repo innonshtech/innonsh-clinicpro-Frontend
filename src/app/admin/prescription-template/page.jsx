@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { API_BASE_URL } from '@/utils/api';
+import { API_BASE_URL, getAuthHeaders } from '@/utils/api';
 import { Save, Sparkles, RefreshCw, CheckCircle, AlertCircle, Palette, FileText, Image as ImageIcon } from 'lucide-react';
 
 export default function PrescriptionTemplateAdmin() {
@@ -53,7 +53,9 @@ export default function PrescriptionTemplateAdmin() {
 
   const fetchClinics = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/clinic/fetch-all-clinics`);
+      const res = await fetch(`${API_BASE_URL}/api/v1/clinic/fetch-all-clinics`, {
+        headers: getAuthHeaders()
+      });
       const result = await res.json();
       if (result.success) {
         setClinics(result.data.clinics || []);

@@ -332,8 +332,8 @@ const BookAppointmentPage = () => {
     <div className="min-h-screen bg-[#f8fafc] p-4 md:p-8">
       {/* Emergency Modal */}
       {showEmergencyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 sm:p-8 animate-in zoom-in-95 duration-200 max-h-[92vh] overflow-y-auto flex flex-col">
             <div className="flex flex-col items-center text-center mb-6">
               <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mb-4 border-4 border-white shadow-sm ring-1 ring-red-100">
                 <AlertCircle className="w-8 h-8" />

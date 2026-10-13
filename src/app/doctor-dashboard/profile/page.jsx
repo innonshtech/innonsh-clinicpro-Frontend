@@ -1,15 +1,20 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { validatePhoneNumber, handlePhoneKeyDown, validateEmail, validateDoctorEmail } from '@/utils/phoneValidation';
 import { API_BASE_URL } from '@/utils/api';
+import { useDoctor } from '@/context/DoctorContext';
 import { 
-  User, Mail, Phone, MapPin, Edit, Save, X, Stethoscope, Building, Award
+  User, Mail, Phone, MapPin, Edit, Save, X, Stethoscope, Building, Award, Camera
 } from 'lucide-react';
 
 export default function DoctorProfilePage() {
   const [doctorData, setDoctorData] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [loading, setLoading] = useState(true);
+  const fileInputRef = useRef(null);
+  const { setDoctor } = useDoctor();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -37,24 +42,151 @@ export default function DoctorProfilePage() {
     fetchProfile();
   }, []);
 
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      alert('Please select a valid image file (JPG, PNG, or WebP).');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+    const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
+    if (file.size > MAX_SIZE) {
+      alert('Image size exceeds 5MB limit. Please choose a smaller image.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('folder', 'doctor-profiles');
+
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const uploadJson = await uploadRes.json().catch(() => ({}));
+      if (!uploadRes.ok || !uploadJson.url) {
+        throw new Error(uploadJson.error || 'Failed to upload photo.');
+      }
+
+      const newImageUrl = uploadJson.url;
+
+      const userStr = localStorage.getItem('user');
+      const user = JSON.parse(userStr || '{}');
+      const doctorId = user.id || user._id;
+      const token = localStorage.getItem('token');
+
+      const updateRes = await fetch(`${API_BASE_URL}/api/v1/doctor/update-by-id/${doctorId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          profileImage: newImageUrl
+        })
+      });
+
+      const updateData = await updateRes.json().catch(() => ({}));
+      if (!updateRes.ok || updateData.success === false) {
+        throw new Error(updateData.message || 'Failed to save photo to profile.');
+      }
+
+      setDoctorData(prev => ({
+        ...prev,
+        profileImage: newImageUrl
+      }));
+
+      if (setDoctor) {
+        setDoctor(prev => ({
+          ...(prev || {}),
+          profileImage: newImageUrl
+        }));
+      }
+
+      if (user) {
+        user.profileImage = newImageUrl;
+        localStorage.setItem('user', JSON.stringify(user));
+      }
+    } catch (err) {
+      console.error('Photo upload error:', err);
+      alert(err.message || 'An error occurred while uploading profile photo.');
+    } finally {
+      setIsUploadingPhoto(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const handleSave = async () => {
+    const emailErr = validateDoctorEmail(doctorData.email, true, 'Email address');
+    if (emailErr) {
+      alert(emailErr);
+      return;
+    }
     setIsSaving(true);
     try {
       const userStr = localStorage.getItem('user');
       const user = JSON.parse(userStr || '{}');
       const doctorId = user.id || user._id;
+      const token = localStorage.getItem('token');
 
       const res = await fetch(`${API_BASE_URL}/api/v1/doctor/update-by-id/${doctorId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify(doctorData)
       });
 
-      if (res.ok) {
+      const resData = await res.json().catch(() => ({}));
+
+      if (res.ok && resData.success !== false) {
+        const returnedDoc = resData.data?.doctor || {};
+        const updatedFirstName = returnedDoc.firstName || returnedDoc.first_name || doctorData.firstName;
+        const updatedLastName = returnedDoc.lastName || returnedDoc.last_name || doctorData.lastName;
+        const updatedProfileImage = returnedDoc.profileImage || returnedDoc.profile_image || doctorData.profileImage;
+
+        const mergedDoctor = {
+          ...doctorData,
+          ...returnedDoc,
+          firstName: updatedFirstName,
+          lastName: updatedLastName,
+          profileImage: updatedProfileImage
+        };
+
+        setDoctorData(mergedDoctor);
+
+        if (setDoctor) {
+          setDoctor(prev => ({
+            ...(prev || {}),
+            ...mergedDoctor
+          }));
+        }
+
+        if (user) {
+          user.firstName = updatedFirstName;
+          user.lastName = updatedLastName;
+          user.name = `Dr. ${updatedFirstName} ${updatedLastName}`;
+          if (updatedProfileImage) {
+            user.profileImage = updatedProfileImage;
+          }
+          localStorage.setItem('user', JSON.stringify(user));
+        }
+
         setIsEditing(false);
+      } else {
+        alert(resData.message || 'Failed to update profile');
       }
     } catch (error) {
       console.error("Update Error:", error);
+      alert(error.message || 'An error occurred while updating profile');
     } finally {
       setIsSaving(false);
     }
@@ -76,7 +208,7 @@ export default function DoctorProfilePage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-8">
+    <div className="max-w-4xl mx-auto pt-0 pb-6 px-4 sm:px-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -88,8 +220,39 @@ export default function DoctorProfilePage() {
         <div className="h-32 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
         <div className="p-6 relative">
           <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-end -mt-16">
-            <div className="w-24 h-24 bg-white rounded-full p-1 shadow-md border flex items-center justify-center text-3xl font-bold text-blue-600">
-              {doctorData.firstName?.[0]}{doctorData.lastName?.[0]}
+            <div className="relative group">
+              <div className="w-24 h-24 bg-white rounded-full p-1 shadow-md border flex items-center justify-center text-3xl font-bold text-blue-600 overflow-hidden">
+                {doctorData.profileImage ? (
+                  <img 
+                    src={doctorData.profileImage} 
+                    alt="Doctor Profile" 
+                    className="w-full h-full object-cover rounded-full" 
+                  />
+                ) : (
+                  <span>{doctorData.firstName?.[0]}{doctorData.lastName?.[0]}</span>
+                )}
+              </div>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handlePhotoUpload}
+                accept="image/jpeg,image/png,image/webp,image/jpg"
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploadingPhoto}
+                title={doctorData.profileImage ? "Change photo" : "Upload photo"}
+                aria-label="Upload or change profile photo"
+                className="absolute bottom-0 right-0 p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-md transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+              >
+                {isUploadingPhoto ? (
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Camera size={14} />
+                )}
+              </button>
             </div>
             <div className="flex-1 text-center sm:text-left">
               <h1 className="text-2xl font-bold text-slate-800">Dr. {doctorData.firstName} {doctorData.lastName}</h1>
@@ -157,9 +320,12 @@ export default function DoctorProfilePage() {
             <label className="text-xs text-slate-400 font-bold flex items-center gap-1"><Phone size={12} /> Phone</label>
             {isEditing ? (
               <input 
-                type="text" 
+                type="tel" 
                 value={doctorData.phone} 
                 onChange={(e) => setDoctorData({...doctorData, phone: e.target.value})}
+                onKeyDown={handlePhoneKeyDown}
+                maxLength={10}
+                placeholder="10-digit phone number"
                 className="w-full mt-1 p-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
               />
             ) : (

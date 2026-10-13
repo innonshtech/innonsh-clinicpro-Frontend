@@ -11,7 +11,8 @@ import {
   CreditCard,
   Home,
   X,
-  User
+  User,
+  FlaskConical
 } from 'lucide-react';
 
 const navigation = [
@@ -19,6 +20,7 @@ const navigation = [
   { name: 'Add Patient', href: '/receptionist-dashboard/patients/add', icon: UserPlus },
   { name: 'View Patients', href: '/receptionist-dashboard/patients', icon: Users },
   { name: 'Appointments', href: '/receptionist-dashboard/appointments', icon: Calendar },
+  { name: 'Lab Orders', href: '/receptionist-dashboard/lab-orders', icon: FlaskConical },
   { name: 'Billing', href: '/receptionist-dashboard/Billing', icon: CreditCard },
   { name: 'Profile', href: '/receptionist-dashboard/profile', icon: User },
 ];
@@ -27,6 +29,7 @@ export default function Sidebar({ isOpen, onClose }) {
   const pathname = usePathname();
   const { user } = useAuth();
   const [userName, setUserName] = useState('MediReception');
+  const [isLabEnabled, setIsLabEnabled] = useState(true);
 
   useEffect(() => {
     const userStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
@@ -37,6 +40,21 @@ export default function Sidebar({ isOpen, onClose }) {
       setUserName(`${activeUser.clinicName} - Receptionist`);
     } else if (activeUser.firstName) {
       setUserName(`${activeUser.firstName} - Receptionist`);
+    }
+
+    const clinicId = activeUser.clinicId || activeUser.clinic_id;
+    if (clinicId) {
+      const token = localStorage.getItem('token');
+      fetch(`${API_BASE_URL}/api/v1/clinic/fetchProfileData/${clinicId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data?.data?.clinic?.modules?.lab === false) {
+            setIsLabEnabled(false);
+          }
+        })
+        .catch(() => {});
     }
 
     const fetchLatestProfile = async () => {
@@ -70,6 +88,16 @@ export default function Sidebar({ isOpen, onClose }) {
     };
     fetchLatestProfile();
   }, [user]);
+
+  const navItems = [
+    { name: 'Dashboard', href: '/receptionist-dashboard', icon: Home },
+    { name: 'Add Patient', href: '/receptionist-dashboard/patients/add', icon: UserPlus },
+    { name: 'View Patients', href: '/receptionist-dashboard/patients', icon: Users },
+    { name: 'Appointments', href: '/receptionist-dashboard/appointments', icon: Calendar },
+    ...(isLabEnabled ? [{ name: 'Lab Orders', href: '/receptionist-dashboard/lab-orders', icon: FlaskConical }] : []),
+    { name: 'Billing', href: '/receptionist-dashboard/Billing', icon: CreditCard },
+    { name: 'Profile', href: '/receptionist-dashboard/profile', icon: User },
+  ];
 
   return (
     <>
@@ -106,7 +134,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
         <nav className="mt-6 px-3 flex-1 overflow-y-auto">
           <div className="space-y-1">
-            {navigation.map((item) => {
+            {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
               

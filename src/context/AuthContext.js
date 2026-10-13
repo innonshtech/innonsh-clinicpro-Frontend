@@ -77,9 +77,10 @@ export const AuthProvider = ({ children }) => {
    * Example: fetch('/api/v1/patient', { headers: getAuthHeaders() })
    */
   const getAuthHeaders = useCallback(() => {
-    if (!token) return {};
+    const currentToken = (typeof window !== 'undefined' ? localStorage.getItem('token') : null) || token;
+    if (!currentToken) return {};
     return {
-      'Authorization': `Bearer ${token}`,
+      'Authorization': `Bearer ${currentToken}`,
       'Content-Type': 'application/json',
     };
   }, [token]);

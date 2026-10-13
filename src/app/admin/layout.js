@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useState, useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { ROLES } from '@/constants/roles';
@@ -9,13 +10,13 @@ import {
   Search, 
   Menu, 
   X,
-  UserPlus,
   Activity,
   BarChart3,
   LogOut,
   ChevronRight,
   Sparkles,
   FileText,
+  FlaskConical,
   Settings as SettingsIcon
 } from 'lucide-react'
 
@@ -27,11 +28,10 @@ export default function DashboardLayout({ children }) {
 
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: Home },
-    { name: 'Doctors', href: '/admin/doctors', icon: Users },
-    { name: 'New Doctor', href: '/admin/doctors/add', icon: UserPlus },
+    { name: 'Clinics', href: '/admin/clinics-manage', icon: Activity },
+    { name: 'Labs', href: '/admin/labs-manage', icon: FlaskConical },
     { name: 'Prescriptions', href: '/admin/prescription-template', icon: FileText },
     { name: 'Reports & Analytics', href: '/admin/analytics', icon: BarChart3 },
-    { name: 'Clinics', href: '/admin/clinics-manage', icon: Activity },
   ]
 
   useEffect(() => {
@@ -56,7 +56,7 @@ export default function DashboardLayout({ children }) {
   }, [router])
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] relative overflow-hidden text-slate-800">
+    <div className="min-h-screen bg-[#f8fafc] relative text-slate-800 overflow-x-clip">
 
       {sidebarOpen && (
         <div
@@ -92,9 +92,11 @@ export default function DashboardLayout({ children }) {
             {navigation.map((item) => {
               const Icon = item.icon
               const isActive = pathname === item.href || 
-                              (item.href !== '/admin' && pathname.startsWith(item.href))
+                              (item.href !== '/admin' && pathname.startsWith(item.href)) ||
+                              (item.href === '/admin/clinics-manage' && pathname.startsWith('/admin/clinics')) ||
+                              (item.href === '/admin/labs-manage' && pathname.startsWith('/admin/labs'));
               return (
-                <a
+                <Link
                   key={item.name}
                   href={item.href}
                   className={`flex items-center px-3 py-2.5 mx-3 mb-1 font-medium rounded-xl transition-all duration-200 ${
@@ -103,7 +105,7 @@ export default function DashboardLayout({ children }) {
                 >
                   <Icon className={`h-5 w-5 mr-3 flex-shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
                   <span className="flex-1">{item.name}</span>
-                </a>
+                </Link>
               )
             })}
           </nav>
@@ -113,7 +115,7 @@ export default function DashboardLayout({ children }) {
       </div>
 
       <div className="lg:pl-72 flex-1 flex flex-col min-h-screen">
-        <header className="sticky top-0 z-30 bg-white border-b border-slate-100">
+        <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
           <div className="flex h-16 items-center justify-between px-8">
             <div className="flex items-center flex-1">
               <button
@@ -128,7 +130,7 @@ export default function DashboardLayout({ children }) {
                   <Search className="w-4 h-4 text-slate-400 absolute left-4" />
                   <input 
                     type="text" 
-                    placeholder="Search clinics, doctors, or reports..." 
+                    placeholder="Search clinics, labs, or reports..." 
                     className="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl pl-12 pr-4 py-3 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all shadow-sm"
                   />
                 </div>
@@ -155,10 +157,10 @@ export default function DashboardLayout({ children }) {
                     <p className="text-sm font-bold text-slate-900 truncate">{userdata?.name}</p>
                     <p className="text-[10px] text-slate-500 font-medium truncate">{userdata?.email}</p>
                   </div>
-                  <a href="/admin/settings" className="flex items-center px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors">
+                  <Link href="/admin/settings" className="flex items-center px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors">
                     <SettingsIcon className="h-4 w-4 mr-3 text-slate-400" />
                     Settings
-                  </a>
+                  </Link>
                   <div className="border-t border-slate-100 my-1"></div>
                   <button 
                     onClick={() => {
@@ -177,7 +179,7 @@ export default function DashboardLayout({ children }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-x-hidden overflow-y-auto p-6 lg:p-8 relative z-10">
+        <main className="flex-1 p-6 lg:p-8 relative">
           {children}
         </main>
       </div>

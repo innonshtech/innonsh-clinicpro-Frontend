@@ -3,6 +3,7 @@ import { API_BASE_URL } from '@/utils/api';
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { validatePhoneNumber, handlePhoneKeyDown } from '@/utils/phoneValidation';
 
 export default function ClinicRegistrationForm() {
   const [formData, setFormData] = useState({
@@ -143,10 +144,9 @@ export default function ClinicRegistrationForm() {
       newErrors.country = 'Country is required';
     }
     
-    if (!formData.phone.trim()) {
-      newErrors.phone = 'Phone number is required';
-    } else if (!/^[\d\s\+\-\(\)]{10,15}$/.test(formData.phone)) {
-      newErrors.phone = 'Invalid phone number format';
+    const phoneErr = validatePhoneNumber(formData.phone, true, 'Phone number');
+    if (phoneErr) {
+      newErrors.phone = phoneErr;
     }
     
     if (!formData.email.trim()) {
@@ -430,9 +430,10 @@ export default function ClinicRegistrationForm() {
                   name="phone"
                   value={formData.phone}
                   onChange={handleChange}
-                  onKeyDown={handleKeyDown}
+                  onKeyDown={handlePhoneKeyDown}
+                  maxLength={10}
                   className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${errors.phone ? 'border-red-500' : 'border-gray-300'}`}
-                  placeholder="+1 (555) 123-4567"
+                  placeholder="10-digit phone number (e.g. 9876543210)"
                 />
                 {errors.phone && <p className="mt-1 text-xs text-red-600">{errors.phone}</p>}
               </div>

@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react'
-import { API_BASE_URL } from '@/utils/api'
+import { API_BASE_URL, getAuthHeaders } from '@/utils/api'
 import axios from 'axios'
 import { 
   TrendingUp, 
@@ -46,7 +46,8 @@ export default function AnalyticsPage() {
   const fetchAnalytics = async () => {
     try {
       setIsRefreshing(true)
-      const res = await axios.get(`${API_BASE_URL}/api/v1/admin/analytics`)
+      const headers = getAuthHeaders();
+      const res = await axios.get(`${API_BASE_URL}/api/v1/admin/analytics`, { headers })
       if (res.data.success) {
         const { stats, patientFlow, departmentStats, topDoctors, recentActivities } = res.data.data
         setStatsData(stats)
