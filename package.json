@@ -14,7 +14,7 @@
     "@heroicons/react": "^2.2.0",
     "@supabase/supabase-js": "^2.108.2",
     "@tanstack/react-table": "^8.21.3",
-    "axios": "^1.9.0",
+    "axios": "^1.18.1",
     "chart.js": "^4.4.9",
     "cloudinary": "^2.6.1",
     "clsx": "^2.1.1",
