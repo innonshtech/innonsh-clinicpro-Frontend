@@ -1,13 +1,43 @@
 'use client';
 // app/components/Layout/Header.jsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Bars3Icon, MagnifyingGlassIcon, ArrowRightOnRectangleIcon, UserIcon } from '@heroicons/react/24/outline'
 import { useRouter, usePathname } from 'next/navigation'
+import { API_BASE_URL } from '@/utils/api'
 
 export default function Header({ onMenuClick }) {
   const router = useRouter()
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [userProfile, setUserProfile] = useState(null)
   const pathname = usePathname()
+
+  const resolveAvatarUrl = (url) => {
+    if (!url) return null;
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:') || url.startsWith('data:')) {
+      return url;
+    }
+    return `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+  };
+
+  useEffect(() => {
+    const loadUser = () => {
+      try {
+        const userStr = localStorage.getItem('user')
+        if (userStr) {
+          const u = JSON.parse(userStr)
+          setUserProfile(u)
+        }
+      } catch (_) {}
+    }
+
+    loadUser()
+    window.addEventListener('storage', loadUser)
+    window.addEventListener('user-profile-updated', loadUser)
+    return () => {
+      window.removeEventListener('storage', loadUser)
+      window.removeEventListener('user-profile-updated', loadUser)
+    }
+  }, [])
 
   const getPageTitle = (path) => {
     if (path === '/receptionist-dashboard') return 'Dashboard';
@@ -21,12 +51,8 @@ export default function Header({ onMenuClick }) {
   };
 
   const handleLogout = () => {
-    // Perform logout actions here (clear tokens, etc.)
-    // For example:
     localStorage.removeItem('token')
-       localStorage.removeItem('user')
-    
-    // Redirect to login page
+    localStorage.removeItem('user')
     router.push('/login')
   }
 
@@ -80,11 +106,25 @@ export default function Header({ onMenuClick }) {
               className="flex items-center space-x-3 hover:bg-slate-50 transition-all rounded-lg p-1"
             >
               <div className="hidden md:flex flex-col items-end">
-                <p className="text-sm font-semibold text-slate-800">Welcome, Receptionist</p>
+                <p className="text-sm font-semibold text-slate-800">
+                  {userProfile?.firstName ? `Welcome, ${userProfile.firstName}` : 'Welcome, Receptionist'}
+                </p>
                 <p className="text-xs text-slate-500">Front Office</p>
               </div>
-              <div className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
-                R
+              <div className="w-9 h-9 rounded-full overflow-hidden flex items-center justify-center bg-blue-600 text-white text-sm font-bold shadow-sm border border-slate-200">
+                {userProfile?.avatarUrl || userProfile?.photo || userProfile?.profileImage ? (
+                  <img
+                    src={resolveAvatarUrl(userProfile.avatarUrl || userProfile.photo || userProfile.profileImage)}
+                    alt="Receptionist Avatar"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.parentElement.innerText = (userProfile?.firstName?.[0] || 'R').toUpperCase();
+                    }}
+                  />
+                ) : (
+                  (userProfile?.firstName?.[0] || 'R').toUpperCase()
+                )}
               </div>
             </button>
 

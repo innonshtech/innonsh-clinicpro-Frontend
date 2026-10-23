@@ -21,7 +21,8 @@ import {
   Power, 
   PowerOff, 
   AlertTriangle,
-  Check
+  Check,
+  Users
 } from 'lucide-react';
 import { API_BASE_URL } from '@/utils/api';
 import { formatTitleCase } from '@/utils/nameFormatting';
@@ -44,10 +45,10 @@ const DEPARTMENTS = [
 ];
 
 const statusClasses = {
-  active: 'bg-emerald-100 text-emerald-800',
-  pending: 'bg-blue-100 text-blue-800',
-  rejected: 'bg-rose-100 text-rose-800',
-  inactive: 'bg-rose-100 text-rose-800'
+  active: 'bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold',
+  pending: 'bg-amber-50 text-amber-700 border border-amber-200 font-semibold',
+  rejected: 'bg-rose-50 text-rose-700 border border-rose-200 font-semibold',
+  inactive: 'bg-slate-100 text-slate-700 border border-slate-200 font-semibold'
 };
 
 const formatDateDisplay = (dateVal) => {
@@ -725,7 +726,7 @@ function DoctorDetailsModal({
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-[680px] max-h-[90vh] flex flex-col overflow-hidden border border-slate-200 z-10 animate-in zoom-in-95 duration-200">
         
         {/* Header with doctor profile */}
-        <div className="flex-shrink-0 bg-gradient-to-r from-teal-50 to-cyan-50 px-6 py-4 border-b border-gray-200 flex items-center justify-between z-10">
+        <div className="flex-shrink-0 bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center justify-between z-10">
           <div className="flex items-center space-x-4 min-w-0">
             {/* Avatar & Photo Menu */}
             <div className="relative shrink-0" ref={photoMenuRef}>
@@ -744,7 +745,7 @@ function DoctorDetailsModal({
                     setIsViewPhotoModalOpen(true);
                   }
                 }}
-                className={`relative h-16 w-16 rounded-full bg-gradient-to-r from-teal-500 to-cyan-400 flex items-center justify-center overflow-hidden shadow-md ring-2 ring-white shrink-0 ${isEditMode || currentDisplayPhoto ? 'cursor-pointer hover:ring-cyan-400 hover:opacity-95 transition-all' : ''}`}
+                className={`relative h-16 w-16 rounded-full bg-blue-600 text-white flex items-center justify-center overflow-hidden shadow-md ring-2 ring-white shrink-0 ${isEditMode || currentDisplayPhoto ? 'cursor-pointer hover:ring-cyan-400 hover:opacity-95 transition-all' : ''}`}
                 title={isEditMode ? 'Click for photo options' : (currentDisplayPhoto ? 'Click to view photo' : undefined)}
               >
                 {currentDisplayPhoto ? (
@@ -845,7 +846,7 @@ function DoctorDetailsModal({
                     />
                   </div>
                 ) : (
-                  <span className="bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent">
+                  <span className="text-slate-900 font-bold text-lg">
                     Dr. {fullName}
                   </span>
                 )}
@@ -872,7 +873,7 @@ function DoctorDetailsModal({
                   </div>
                 ) : (
                   <>
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-cyan-100 text-cyan-800">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 font-semibold">
                       {doctor.specialty || 'General'}
                     </span>
                     {doctor.supSpeciality && (
@@ -1812,7 +1813,7 @@ function DoctorDetailsModal({
                 type="button"
                 onClick={handleSaveDoctor}
                 disabled={isUpdating || isPhotoUploading || isDocUploading}
-                className="px-5 py-2 text-sm font-medium text-white bg-gradient-to-r from-teal-600 to-cyan-600 rounded-lg hover:from-teal-700 hover:to-cyan-700 transition-all shadow-md disabled:opacity-70 flex items-center gap-2 cursor-pointer"
+                className="px-5 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm disabled:opacity-70 flex items-center gap-2 cursor-pointer"
               >
                 {(isUpdating || isPhotoUploading || isDocUploading) ? (
                   <>
@@ -1840,7 +1841,7 @@ function DoctorDetailsModal({
               <button
                 type="button"
                 onClick={() => setIsEditMode(true)}
-                className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md flex items-center cursor-pointer"
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm flex items-center cursor-pointer"
               >
                 <Pencil className="h-4 w-4 mr-2" />
                 Edit Profile
@@ -1952,8 +1953,14 @@ function StatusConfirmationModal({
   const doctorName = `Dr. ${formatTitleCase(doctor.firstName || doctor.first_name || '')} ${formatTitleCase(doctor.lastName || doctor.last_name || '')}`.trim();
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-100 relative animate-in zoom-in-95 duration-150">
+    <div 
+      onClick={onClose}
+      className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-150"
+    >
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-100 relative animate-in zoom-in-95 duration-150"
+      >
         <button
           onClick={onClose}
           disabled={isLoading}
@@ -2282,19 +2289,19 @@ export default function DoctorsPage() {
   }, [doctors]);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+      {/* 1. Header Section — Matches Bed & Ward Management & Lab Orders */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Doctor Management</h1>
-          <p className="text-sm text-gray-500">Manage your clinic doctors, edit profiles, and regulate active statuses</p>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Doctor Management</h1>
+          <p className="text-slate-500 text-sm mt-0.5">Manage your clinic doctors, edit profiles, and regulate active statuses</p>
         </div>
         <Link
           href="/clinic/doctors/add"
-          className="flex items-center justify-center px-4 py-2 bg-gradient-to-r from-teal-600 to-cyan-600 text-white rounded-lg hover:from-teal-700 hover:to-cyan-700 transition-all shadow-md hover:shadow-lg font-medium text-sm"
+          className="inline-flex items-center justify-center px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-sm gap-2 shrink-0 self-start sm:self-auto"
         >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Doctor
+          <Plus className="w-4 h-4" />
+          <span>Add Doctor</span>
         </Link>
       </div>
 
@@ -2329,7 +2336,7 @@ export default function DoctorsPage() {
       )}
 
       {/* Filters and Search */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="relative flex-1 max-w-2xl">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -2417,7 +2424,7 @@ export default function DoctorsPage() {
       </div>
 
       {/* Doctor Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         {loading ? (
           <div className="p-8 flex justify-center items-center">
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-cyan-500"></div>
@@ -2425,7 +2432,7 @@ export default function DoctorsPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs uppercase font-semibold">
                 <tr>
                   <th
                     scope="col"
@@ -2512,8 +2519,10 @@ export default function DoctorsPage() {
                               )}
                             </div>
                             <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900">Dr. {fullName}</div>
-                              <div className="text-sm text-gray-500">{doctor.location || doctor.hospitalAddress || doctor.homeAddress || 'No address'}</div>
+                              <div className="text-sm font-semibold text-slate-900">Dr. {fullName}</div>
+                              {doctor.department && (
+                                <div className="text-xs text-slate-500 font-medium">{doctor.department}</div>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -2550,7 +2559,7 @@ export default function DoctorsPage() {
                                 setIsEditMode(false);
                                 setShowViewModal(true);
                               }}
-                              className="text-cyan-600 hover:text-cyan-900 p-1.5 rounded-lg hover:bg-cyan-50 transition-colors"
+                              className="text-slate-500 hover:text-blue-600 p-1.5 rounded-lg hover:bg-blue-50 transition-colors"
                               title="View details"
                             >
                               <Eye className="h-4 w-4" />
@@ -2563,7 +2572,7 @@ export default function DoctorsPage() {
                                 setIsEditMode(true);
                                 setShowViewModal(true);
                               }}
-                              className="text-blue-600 hover:text-blue-900 p-1.5 rounded-lg hover:bg-blue-50 transition-colors"
+                              className="text-slate-500 hover:text-blue-600 p-1.5 rounded-lg hover:bg-blue-50 transition-colors"
                               title="Edit doctor profile"
                             >
                               <Pencil className="h-4 w-4" />

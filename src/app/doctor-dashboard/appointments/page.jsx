@@ -1,653 +1,102 @@
 'use client';
-// // import React, { useState, useEffect } from 'react';
-// import {
-//   Clock,
-//   Search,
-//   Plus,
-//   ChevronDown,
-//   Check,
-//   X,
-//   MoreVertical,
-//   User,
-//   Phone,
-//   Stethoscope,
-//   Pill,
-//   FileText,
-//   CheckCircle
-// } from 'lucide-react';
 
-// const DoctorAppointmentsDashboard = () => {
-//   const [appointments, setAppointments] = useState([]);
-//   const [searchTerm, setSearchTerm] = useState('');
-//   const [activeTab, setActiveTab] = useState('all');
-//   const [expandedAppointment, setExpandedAppointment] = useState(null);
-//   const [showStatusDropdown, setShowStatusDropdown] = useState(null);
-//   const [showPrescriptionForm, setShowPrescriptionForm] = useState(null);
-//   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-//   const [userId, setId] = useState("");
-//   const [prescription, setPrescription] = useState({
-//     medicines: [{ name: '', dosage: '', frequency: '', duration: '' }],
-//     additionalNotes: ''
-//   });
-
-//   useEffect(() => {
-//     const user = localStorage.getItem('user');
-//     if (user) {
-//       const data = JSON.parse(user);
-//       setId(data?.id);
-//     }
-//   }, []);
-
-//   const fetchAppointmentsByDoc = async (doctorId) => {
-//     try {
-//       const res = await fetch(`${API_BASE_URL}/api/appointment/fetchbydoctor/${doctorId}`);
-//       if (!res.ok) {
-//         throw new Error('Failed to fetch appointments');
-//       }
-//       const response = await res.json();
-//       console.log("sdf",response);
-//       setAppointments(response.data || []);
-//     } catch (error) {
-//       console.error("Error fetching appointments:", error);
-//     }
-//   };
-
-//   useEffect(() => {
-//     if (userId) {
-//       fetchAppointmentsByDoc(userId);
-//     }
-//   }, [userId]);
-
-//   // Status styling
-//   const statusStyles = {
-//     confirmed: {
-//       bg: 'bg-emerald-500/10',
-//       text: 'text-emerald-600',
-//       icon: <Check className="w-4 h-4 text-emerald-500" />,
-//       border: 'border-emerald-500/20'
-//     },
-//     checkedIn: {
-//       bg: 'bg-blue-500/10',
-//       text: 'text-blue-600',
-//       icon: <CheckCircle className="w-4 h-4 text-blue-500" />,
-//       border: 'border-blue-500/20'
-//     },
-//     cancelled: {
-//       bg: 'bg-rose-500/10',
-//       text: 'text-rose-600',
-//       icon: <X className="w-4 h-4 text-rose-500" />,
-//       border: 'border-rose-500/20'
-//     }
-//   };
-
-//   // Status options for dropdown
-//   const statusOptions = [
-//     { value: 'confirmed', label: 'Confirmed', color: 'text-emerald-600' },
-//     { value: 'checkedIn', label: 'Checked In', color: 'text-blue-600' },
-//     { value: 'cancelled', label: 'Cancelled', color: 'text-rose-600' }
-//   ];
-
-//   // Filter appointments based on active tab and search term
-//   const filteredAppointments = appointments.filter(appointment => {
-//     const matchesSearch = appointment.patientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-//                          appointment.patientNote?.toLowerCase().includes(searchTerm.toLowerCase());
-
-//     let matchesTab = true;
-
-
-//      if (activeTab === 'all') {
-//     matchesTab = appointment.status === 'confirmed';  // Only show confirmed appointments in "All" tab
-//   } else if (activeTab === 'checkedIn') {
-//     matchesTab = appointment.status === 'checkedIn';
-//   } else if (activeTab === 'cancelled') {
-//     matchesTab = appointment.status === 'cancelled';
-//   }
-//     return matchesSearch && matchesTab;
-//   });
-
-//   // Update appointment status
-//   const updateAppointmentStatus = async (appointmentId, newStatus) => {
-//     setIsUpdatingStatus(true);
-//     try {
-//       // For checkedIn status, just expand and show form (don't update status yet)
-//       if (newStatus === 'checkedIn') {
-//         setExpandedAppointment(appointmentId);
-//         setShowPrescriptionForm(appointmentId);
-//         setIsUpdatingStatus(false);
-//         setShowStatusDropdown(null);
-//         return;
-//       }
-
-//       // For other status changes, update immediately
-//       await new Promise(resolve => setTimeout(resolve, 500));
-
-//       setAppointments(prevAppointments => 
-//         prevAppointments.map(appointment => 
-//           appointment.id === appointmentId 
-//             ? { ...appointment, status: newStatus }
-//             : appointment
-//         )
-//       );
-//     } catch (error) {
-//       console.error("Error updating appointment status:", error);
-//     } finally {
-//       setIsUpdatingStatus(false);
-//       setShowStatusDropdown(null);
-//     }
-//   };
-
-//   // Handle prescription input changes
-//   const handlePrescriptionChange = (e, index) => {
-//     const { name, value } = e.target;
-//     const updatedMedicines = [...prescription.medicines];
-//     updatedMedicines[index] = {
-//       ...updatedMedicines[index],
-//       [name]: value
-//     };
-//     setPrescription(prev => ({
-//       ...prev,
-//       medicines: updatedMedicines
-//     }));
-//   };
-
-//   // Add new medicine field
-//   const addMedicineField = () => {
-//     setPrescription(prev => ({
-//       ...prev,
-//       medicines: [...prev.medicines, { name: '', dosage: '', frequency: '', duration: '' }]
-//     }));
-//   };
-
-//   // Remove medicine field
-//   const removeMedicineField = (index) => {
-//     const updatedMedicines = [...prescription.medicines];
-//     updatedMedicines.splice(index, 1);
-//     setPrescription(prev => ({
-//       ...prev,
-//       medicines: updatedMedicines
-//     }));
-//   };
-
-//   // Validate prescription form
-//   const validatePrescription = () => {
-//     return prescription.medicines.every(med => 
-//       med.name && med.dosage && med.frequency && med.duration
-//     ) && prescription.additionalNotes;
-//   };
-
-// const submitPrescription = async (appointmentId) => {
-//   if (!validatePrescription()) {
-//     alert('Please fill all medicine details and additional notes');
-//     return;
-//   }
-
-//   try {
-//     // First update the prescription data
-//     const prescriptionResponse = await fetch(`${API_BASE_URL}/api/appointment/addMedicines`, {
-//       method: 'PATCH',
-//       headers: {
-//         'Content-Type': 'application/json',
-//       },
-//       body: JSON.stringify({
-//         appointmentId,
-//         description: prescription.additionalNotes,
-//         medicines: prescription.medicines
-//       }),
-//     });
-
-//     if (!prescriptionResponse.ok) {
-//       throw new Error('Failed to update prescription');
-//     }
-
-//     // Then update the status to 'checkedIn'
-//     const statusResponse = await fetch(`${API_BASE_URL}/api/appointment/updateStatus`, {
-//       method: 'PATCH',
-//       headers: {
-//         'Content-Type': 'application/json',
-//       },
-//       body: JSON.stringify({
-//         appointmentId,
-//         status: 'checkedIn'
-//       }),
-//     });
-
-//     if (!statusResponse.ok) {
-//       throw new Error('Failed to update status');
-//     }
-
-//     const statusData = await statusResponse.json();
-
-//     // Update local state
-//     setAppointments(prevAppointments => 
-//       prevAppointments.map(appointment => 
-//         appointment._id === appointmentId 
-//           ? { 
-//               ...appointment, 
-//               status: 'checkedIn',
-//               medicines: prescription.medicines,
-//               description: prescription.additionalNotes
-//             }
-//           : appointment
-//       )
-//     );
-
-//     // Reset form
-//     setPrescription({
-//       medicines: [{ name: '', dosage: '', frequency: '', duration: '' }],
-//       additionalNotes: ''
-//     });
-//     setShowPrescriptionForm(null);
-//       setExpandedAppointment(null); 
-
-//   } catch (error) {
-//     console.error("Error submitting prescription:", error);
-//     // Optionally show error to user
-//   }
-// };
-
-//   return (
-//     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50/30 p-4 sm:p-6">
-//       <div className="max-w-7xl mx-auto">
-//         {/* Header */}
-//         <div className="bg-white/70 backdrop-blur-lg rounded-2xl shadow-sm p-6 mb-6 border border-white/80">
-//           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-//             <div className="flex items-center gap-3">
-//               <div className="p-3 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl shadow-lg">
-//                 <Stethoscope className="text-white w-6 h-6" />
-//               </div>
-//               <div>
-//                 <h1 className="text-2xl font-bold text-gray-800">Doctor's Dashboard</h1>
-//                 <p className="text-sm text-gray-500/90">Manage patient appointments and prescriptions</p>
-//               </div>
-//             </div>
-//           </div>
-//         </div>
-
-//         {/* Search and Filters */}
-//         <div className="bg-white/70 backdrop-blur-lg rounded-2xl shadow-sm p-5 mb-6 border border-white/80">
-//           <div className="flex flex-col sm:flex-row gap-3">
-//             <div className="relative flex-grow">
-//               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-//                 <Search className="text-blue-500/80 w-5 h-5" />
-//               </div>
-//               <input
-//                 type="text"
-//                 placeholder="Search patients or notes..."
-//                 className="w-full pl-11 pr-4 py-3 text-sm border border-gray-200/70 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/30 transition-all bg-white/50"
-//                 value={searchTerm}
-//                 onChange={(e) => setSearchTerm(e.target.value)}
-//               />
-//             </div>
-//           </div>
-//         </div>
-
-//         {/* Tabs */}
-//         <div className="bg-white/70 backdrop-blur-lg rounded-2xl shadow-sm overflow-hidden border border-white/80 mb-6">
-//           <div className="flex border-b border-gray-200/50">
-//             <button
-//               onClick={() => setActiveTab('all')}
-//               className={`flex-1 py-3 px-4 text-center font-medium text-sm transition-colors ${activeTab === 'all' ? 'text-blue-600 border-b-2 border-blue-500' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50/50'}`}
-//             >
-//               All Appointments
-//             </button>
-//             <button
-//               onClick={() => setActiveTab('checkedIn')}
-//               className={`flex-1 py-3 px-4 text-center font-medium text-sm transition-colors ${activeTab === 'checkedIn' ? 'text-blue-600 border-b-2 border-blue-500' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50/50'}`}
-//             >
-//               Checked In
-//             </button>
-//             <button
-//               onClick={() => setActiveTab('cancelled')}
-//               className={`flex-1 py-3 px-4 text-center font-medium text-sm transition-colors ${activeTab === 'cancelled' ? 'text-rose-600 border-b-2 border-rose-500' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50/50'}`}
-//             >
-//               Cancelled
-//             </button>
-//           </div>
-//         </div>
-
-//         {/* Appointments List */}
-//         <div className="bg-white/70 backdrop-blur-lg rounded-2xl shadow-sm overflow-hidden border border-white/80">
-//           <div className="p-5 border-b border-gray-200/50">
-//             <div className="flex items-center justify-between">
-//               <h3 className="text-lg font-semibold text-gray-800">
-//                 {activeTab === 'all' && 'All Appointments'}
-//                 {activeTab === 'checkedIn' && 'Checked In Appointments'}
-//                 {activeTab === 'cancelled' && 'Cancelled Appointments'}
-//               </h3>
-//               <div className="text-xs text-blue-600 font-medium bg-blue-100/30 px-3 py-1.5 rounded-full border border-blue-200/50">
-//                 {filteredAppointments.length} {filteredAppointments.length === 1 ? 'appointment' : 'appointments'}
-//               </div>
-//             </div>
-//           </div>
-
-//           <div className="divide-y divide-gray-200/30">
-//             {filteredAppointments.length > 0 ? (
-//               filteredAppointments.map((appointment) => (
-//                 <div 
-//                   key={appointment._id} 
-//                   className={`relative transition-all duration-200 ${
-//                     expandedAppointment === appointment.id || showStatusDropdown === appointment.id 
-//                       ? 'bg-blue-50/20 min-h-[200px]' 
-//                       : 'hover:bg-blue-50/10 min-h-[100px]'
-//                   }`}
-//                   onClick={(e) => {
-//                     // Don't toggle if clicking on status dropdown or prescription form
-//                     if (!e.target.closest('.status-dropdown') && !e.target.closest('.prescription-form')) {
-//                       setExpandedAppointment(expandedAppointment === appointment.id ? null : appointment.id);
-//                     }
-//                   }}
-//                 >
-//                   {/* Appointment Row */}
-//                   <div className="grid grid-cols-12 gap-4 items-center p-4 md:p-5">
-//                     {/* Patient Column */}
-//                     <div className="col-span-12 md:col-span-3 flex items-center gap-4">
-//                       <div className="flex items-center">
-//                         <div>
-//                           <p className="text-sm font-bold text-gray-900 capitalize">
-//                             {appointment.patient_name || "Unknown Patient"}
-//                           </p>
-//                           <div className="flex items-center gap-2 mt-0.5">
-//                             <span className="text-[10px] bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded uppercase">
-//                               #{appointment.patientId?.patientId || appointment.patient_id?.slice(-6) || 'N/A'}
-//                             </span>
-//                           </div>
-//                         </div>
-//                       </div>
-//                       <div className="min-w-0">
-//                         <p className="text-sm font-medium text-gray-800 truncate">{appointment.patientName}</p>
-//                         <p className="text-xs text-gray-500/90 flex items-center gap-1.5 mt-1">
-//                           <Phone className="w-3 h-3 flex-shrink-0 text-blue-500/70" />
-//                           <span className="truncate">{appointment.patientNumber}</span>
-//                         </p>
-//                       </div>
-//                     </div>
-
-//                     {/* Time Column */}
-//                     <div className="col-span-6 md:col-span-2">
-//                       <div className="flex items-center gap-2">
-//                         <Clock className="text-blue-500/80 w-4 h-4 flex-shrink-0" />
-//                         <span className="text-sm text-gray-700">
-//                           {appointment.time}
-//                         </span>
-//                       </div>
-//                     </div>
-
-//                     {/* Reason Column */}
-//                     <div className="hidden md:block col-span-4">
-//                       <p className="text-sm text-gray-600/90 truncate">
-//                         {appointment.patientNote}
-//                       </p>
-//                     </div>
-
-//                     {/* Status Column */}
-//                     <div className="col-span-6 md:col-span-2 relative">
-//                       <div className="status-dropdown">
-//                         {activeTab === 'all' && (
-//                           <button
-//                             onClick={(e) => {
-//                               e.stopPropagation();
-//                               setShowStatusDropdown(showStatusDropdown === appointment.id ? null : appointment.id);
-//                             }}
-//                             disabled={isUpdatingStatus}
-//                             className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-medium transition-all hover:shadow-sm disabled:opacity-50 ${statusStyles[appointment.status]?.bg || 'bg-gray-100'} ${statusStyles[appointment.status]?.text || 'text-gray-600'} border ${statusStyles[appointment.status]?.border || 'border-gray-300'}`}
-//                           >
-//                             {statusStyles[appointment.status]?.icon || <Clock className="w-4 h-4" />}
-//                             {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
-//                             <ChevronDown size={12} />
-//                           </button>
-//                         )}
-
-//                         {activeTab !== 'all' && (
-//                           <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-medium ${statusStyles[appointment.status]?.bg || 'bg-gray-100'} ${statusStyles[appointment.status]?.text || 'text-gray-600'} border ${statusStyles[appointment.status]?.border || 'border-gray-300'}`}>
-//                             {statusStyles[appointment.status]?.icon || <Clock className="w-4 h-4" />}
-//                             {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
-//                           </div>
-//                         )}
-
-//                         {/* Status Dropdown Menu */}
-//                         {showStatusDropdown === appointment.id && activeTab === 'all' && (
-//                           <div className="absolute top-full left-0 mt-1 w-40 bg-white rounded-xl shadow-lg border border-gray-200/70 z-30 overflow-hidden">
-//                             {statusOptions.map((status) => (
-//                               <button
-//                                 key={status.value}
-//                                 onClick={(e) => {
-//                                   e.stopPropagation();
-//                                   updateAppointmentStatus(appointment.id, status.value);
-//                                 }}
-//                                 disabled={isUpdatingStatus || appointment.status === status.value}
-//                                 className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${status.color}`}
-//                               >
-//                                 {statusStyles[status.value]?.icon}
-//                                 {status.label}
-//                                 {appointment.status === status.value && (
-//                                   <Check className="w-3 h-3 ml-auto" />
-//                                 )}
-//                               </button>
-//                             ))}
-//                           </div>
-//                         )}
-//                       </div>
-//                     </div>
-
-//                     {/* Actions Column */}
-//                     <div className="col-span-6 md:col-span-1 flex justify-end">
-//                       <button 
-//                         className="p-1.5 text-gray-400/90 hover:text-gray-600 transition-colors rounded-lg hover:bg-gray-100/50"
-//                         onClick={(e) => {
-//                           e.stopPropagation();
-//                           setExpandedAppointment(expandedAppointment === appointment.id ? null : appointment.id);
-//                         }}
-//                       >
-//                         <MoreVertical size={18} />
-//                       </button>
-//                     </div>
-//                   </div>
-
-//                   {/* Expanded Details */}
-//                   {(expandedAppointment === appointment.id || appointment.status === 'checkedIn') && (
-//                     <div className="px-6 pb-4 border-t border-gray-200/30 bg-blue-50/10 prescription-form">
-//                       <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-//                         <div>
-//                           <h5 className="text-sm font-medium text-gray-700 mb-2">Patient Information</h5>
-//                           <div className="space-y-1 text-sm text-gray-600">
-//                             <p><span className="font-medium">Email:</span> {appointment.patientEmail}</p>
-//                             <p><span className="font-medium">Phone:</span> {appointment.patientNumber}</p>
-//                           </div>
-//                         </div>
-//                         <div>
-//                           <h5 className="text-sm font-medium text-gray-700 mb-2">Appointment Details</h5>
-//                           <div className="space-y-1 text-sm text-gray-600">
-//                             <p><span className="font-medium">Date:</span> {appointment.appointmentDate}</p>
-//                             <p><span className="font-medium">Time:</span> {appointment.time}</p>
-//                             <p><span className="font-medium">Notes:</span> {appointment.patientNote}</p>
-//                           </div>
-//                         </div>
-//                       </div>
-
-//                       {/* Prescription Form (shown when status is checkedIn or being changed to checkedIn) */}
-//                       {(showPrescriptionForm === appointment.id || appointment.status === 'checkedIn') && (
-//                         <div className="mt-6 bg-white/80 p-4 rounded-lg border border-gray-200/50">
-//                           <h5 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
-//                             <Pill className="text-blue-500 w-4 h-4" />
-//                             Prescription
-//                           </h5>
-
-//                           {prescription.medicines.map((medicine, index) => (
-//                             <div key={index} className="grid grid-cols-12 gap-3 mb-3">
-//                               <div className="col-span-5">
-//                                 <label className="block text-xs text-gray-500 mb-1">Medicine Name</label>
-//                                 <input
-//                                   type="text"
-//                                   name="name"
-//                                   value={medicine.name}
-//                                   onChange={(e) => handlePrescriptionChange(e, index)}
-//                                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
-//                                   placeholder="e.g., Paracetamol"
-//                                   required
-//                                 />
-//                               </div>
-//                               <div className="col-span-2">
-//                                 <label className="block text-xs text-gray-500 mb-1">Dosage</label>
-//                                 <input
-//                                   type="text"
-//                                   name="dosage"
-//                                   value={medicine.dosage}
-//                                   onChange={(e) => handlePrescriptionChange(e, index)}
-//                                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
-//                                   placeholder="e.g., 500mg"
-//                                   required
-//                                 />
-//                               </div>
-//                               <div className="col-span-2">
-//                                 <label className="block text-xs text-gray-500 mb-1">Frequency</label>
-//                                 <input
-//                                   type="text"
-//                                   name="frequency"
-//                                   value={medicine.frequency}
-//                                   onChange={(e) => handlePrescriptionChange(e, index)}
-//                                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
-//                                   placeholder="e.g., 2x daily"
-//                                   required
-//                                 />
-//                               </div>
-//                               <div className="col-span-2">
-//                                 <label className="block text-xs text-gray-500 mb-1">Duration</label>
-//                                 <input
-//                                   type="text"
-//                                   name="duration"
-//                                   value={medicine.duration}
-//                                   onChange={(e) => handlePrescriptionChange(e, index)}
-//                                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
-//                                   placeholder="e.g., 7 days"
-//                                   required
-//                                 />
-//                               </div>
-//                               <div className="col-span-1 flex items-end">
-//                                 {index > 0 && (
-//                                   <button
-//                                     type="button"
-//                                     onClick={() => removeMedicineField(index)}
-//                                     className="p-2 text-rose-500 hover:text-rose-700"
-//                                   >
-//                                     <X size={16} />
-//                                   </button>
-//                                 )}
-//                               </div>
-//                             </div>
-//                           ))}
-
-//                           <button
-//                             type="button"
-//                             onClick={addMedicineField}
-//                             className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 mb-4"
-//                           >
-//                             <Plus size={14} />
-//                             Add another medicine
-//                           </button>
-
-//                           <div className="mb-4">
-//                             <label className="block text-xs text-gray-500 mb-1">Additional Notes</label>
-//                             <textarea
-//                               name="additionalNotes"
-//                               value={prescription.additionalNotes}
-//                               onChange={(e) => setPrescription(prev => ({ ...prev, additionalNotes: e.target.value }))}
-//                               rows={2}
-//                               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
-//                               placeholder="Any additional instructions..."
-//                               required
-//                             />
-//                           </div>
-
-//                           <div className="flex justify-end gap-3">
-//                             <button
-//                               type="button"
-//                               onClick={() => {
-//                                 setShowPrescriptionForm(null);
-//                                 setPrescription({
-//                                   medicines: [{ name: '', dosage: '', frequency: '', duration: '' }],
-//                                   additionalNotes: ''
-//                                 });
-//                               }}
-//                               className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-//                             >
-//                               Cancel
-//                             </button>
-//                             <button
-//                               type="button"
-//                               onClick={() => submitPrescription(appointment._id)}
-//                               className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm rounded-lg transition-all flex items-center gap-2"
-//                             >
-//                               <FileText size={16} />
-//                               Submit Prescription
-//                             </button>
-//                           </div>
-//                         </div>
-//                       )}
-//                     </div>
-//                   )}
-//                 </div>
-//               ))
-//             ) : (
-//               <div className="p-8 text-center">
-//                 <div className="mx-auto w-16 h-16 rounded-xl bg-blue-100/30 border border-blue-200/30 flex items-center justify-center mb-4 shadow-inner">
-//                   <Search className="text-blue-500/80 w-6 h-6" />
-//                 </div>
-//                 <h4 className="text-lg font-medium text-gray-700 mb-1">No appointments found</h4>
-//                 <p className="text-sm text-gray-500/90">
-//                   {activeTab === 'all' && 'Try adjusting your search criteria'}
-//                   {activeTab === 'checkedIn' && 'No checked-in appointments found'}
-//                   {activeTab === 'cancelled' && 'No cancelled appointments found'}
-//                 </p>
-//               </div>
-//             )}
-//           </div>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default DoctorAppointmentsDashboard;
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { API_BASE_URL } from '@/utils/api';
 import {
+  Calendar,
   Clock,
   Search,
-  Plus,
-  ChevronDown,
-  Check,
-  X,
-  MoreVertical,
-  User,
-  Phone,
-  Stethoscope,
-  Pill,
-  FileText,
   CheckCircle,
-  Activity
+  X,
+  Stethoscope,
+  Activity,
+  AlertTriangle,
+  RefreshCw,
+  User,
+  ChevronRight,
+  Filter
 } from 'lucide-react';
 
+// Chronological time slot parser converting "10:30 AM", "03:00 PM" to minutes from midnight
+export const parseTimeSlotToMinutes = (slotStr) => {
+  if (!slotStr || typeof slotStr !== 'string') return 9999;
+  const startPart = slotStr.split('-')[0].trim();
+  const match = startPart.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  if (!match) return 9999;
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const modifier = (match[3] || '').toUpperCase();
+
+  if (modifier === 'PM' && hours < 12) hours += 12;
+  if (modifier === 'AM' && hours === 12) hours = 0;
+
+  return hours * 60 + minutes;
+};
+
+// Unified doctor appointment comparator (Emergencies -> Status lifecycle -> Time Slot)
+export const compareDoctorAppointments = (a, b) => {
+  // 1. Emergency prioritization: Emergency patients always float to top
+  if (a.is_emergency && !b.is_emergency) return -1;
+  if (!a.is_emergency && b.is_emergency) return 1;
+
+  // 2. Appointment status lifecycle ordering
+  const statusRank = {
+    in_progress: 1,
+    checked_in: 2,
+    checkedIn: 2,
+    booked: 3,
+    scheduled: 3,
+    pending: 3,
+    completed: 4,
+    cancelled: 5
+  };
+  const rankA = statusRank[a.status] || 99;
+  const rankB = statusRank[b.status] || 99;
+  if (rankA !== rankB) return rankA - rankB;
+
+  // 3. For checked_in / in_progress patients: if clinic issued queue_number exists, order by it
+  if (rankA <= 2 && a.queue_number && b.queue_number && a.queue_number !== b.queue_number) {
+    return a.queue_number - b.queue_number;
+  }
+
+  // 4. Chronological time-slot ordering (earlier slots strictly precede later slots)
+  const timeA = parseTimeSlotToMinutes(a.time_slot);
+  const timeB = parseTimeSlotToMinutes(b.time_slot);
+  if (timeA !== timeB) return timeA - timeB;
+
+  // 5. Tie-breaker by queue_number or ID
+  const qA = a.queue_number || 9999;
+  const qB = b.queue_number || 9999;
+  if (qA !== qB) return qA - qB;
+
+  return String(a.appointment_id || a.id || '').localeCompare(String(b.appointment_id || b.id || ''));
+};
+
 const DoctorAppointmentsDashboard = () => {
-  const router = useRouter(); // Next.js router
+  const router = useRouter();
   const [appointments, setAppointments] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('all');
-  const [userId, setId] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [userId, setId] = useState('');
 
   useEffect(() => {
     const user = localStorage.getItem('user');
     if (user) {
-      const data = JSON.parse(user);
-      setId(data?.id);
+      try {
+        const data = JSON.parse(user);
+        setId(data?.id || data?._id || '');
+      } catch (e) {
+        console.error('Error parsing user data:', e);
+      }
     }
   }, []);
 
   const fetchDailyAppointments = async () => {
+    setIsLoading(true);
     try {
-      const token = localStorage.getItem('token');
-
+      const token = localStorage.getItem('token')?.trim();
       const res = await fetch(`${API_BASE_URL}/api/v1/doctor/appointments`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -661,216 +110,438 @@ const DoctorAppointmentsDashboard = () => {
         console.error('Failed to fetch appointments:', responseData.message);
       }
     } catch (error) {
-      console.error("Error fetching appointments:", error);
+      console.error('Error fetching appointments:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    if (userId) fetchDailyAppointments();
+    if (userId) {
+      fetchDailyAppointments();
+    }
   }, [userId]);
 
-  const statusStyles = {
-    pending: {
-      bg: 'bg-yellow-500/10',
-      text: 'text-yellow-600',
-      icon: <Clock className="w-4 h-4 text-yellow-500" />,
-      border: 'border-yellow-500/20'
-    },
-    scheduled: {
-      bg: 'bg-emerald-500/10',
-      text: 'text-emerald-600',
-      icon: <Check className="w-4 h-4 text-emerald-500" />,
-      border: 'border-emerald-500/20'
-    },
-    checked_in: {
-      bg: 'bg-blue-500/10',
-      text: 'text-blue-600',
-      icon: <CheckCircle className="w-4 h-4 text-blue-500" />,
-      border: 'border-blue-500/20'
-    },
-    completed: {
-      bg: 'bg-purple-500/10',
-      text: 'text-purple-600',
-      icon: <Check className="w-4 h-4 text-purple-500" />,
-      border: 'border-purple-500/20'
-    },
-    booked: {
-      bg: 'bg-emerald-500/10',
-      text: 'text-emerald-600',
-      icon: <Check className="w-4 h-4 text-emerald-500" />,
-      border: 'border-emerald-500/20'
-    },
-    in_progress: {
-      bg: 'bg-blue-500/10',
-      text: 'text-blue-600',
-      icon: <Activity className="w-4 h-4 text-blue-500" />,
-      border: 'border-blue-500/20'
-    },
-    cancelled: {
-      bg: 'bg-rose-500/10',
-      text: 'text-rose-600',
-      icon: <X className="w-4 h-4 text-rose-500" />,
-      border: 'border-rose-500/20'
+  // Robust patient name resolution fallback
+  const getPatientName = (app) => {
+    if (app.patient_name && app.patient_name.trim() && app.patient_name !== 'Unknown Patient') {
+      return app.patient_name.trim();
+    }
+    if (typeof app.patientId === 'object' && app.patientId) {
+      const name = `${app.patientId.first_name || ''} ${app.patientId.last_name || ''}`.trim();
+      if (name) return name;
+    }
+    if (app.patients) {
+      const name = `${app.patients.first_name || ''} ${app.patients.last_name || ''}`.trim();
+      if (name) return name;
+    }
+    if (app.patientName && app.patientName.trim()) {
+      return app.patientName.trim();
+    }
+    return 'Patient';
+  };
+
+  // Compute normalized appointments with guaranteed continuous sequential queue numbering (no skips or duplicates)
+  const normalizedAppointments = useMemo(() => {
+    const sorted = [...appointments].sort(compareDoctorAppointments);
+
+    return sorted.map((app, index) => ({
+      ...app,
+      sequential_queue: index + 1,
+      displayName: getPatientName(app),
+      displayCode: app.patient_code || app.patientId?.patient_code || (app.patient_id ? `#${String(app.patient_id).slice(-6)}` : 'N/A')
+    }));
+  }, [appointments]);
+
+  // Tab counts
+  const counts = useMemo(() => {
+    const all = normalizedAppointments.length;
+    const waiting = normalizedAppointments.filter(
+      (a) => a.status === 'checked_in' || a.status === 'checkedIn'
+    ).length;
+    const inProgress = normalizedAppointments.filter((a) => a.status === 'in_progress').length;
+    const completed = normalizedAppointments.filter((a) => a.status === 'completed').length;
+    const scheduled = normalizedAppointments.filter(
+      (a) => a.status === 'scheduled' || a.status === 'booked' || a.status === 'pending'
+    ).length;
+
+    return { all, waiting, inProgress, completed, scheduled };
+  }, [normalizedAppointments]);
+
+  // Filtered appointments by search term & active tab
+  const filteredAppointments = useMemo(() => {
+    return normalizedAppointments.filter((app) => {
+      // Search matching
+      if (searchTerm.trim()) {
+        const query = searchTerm.trim().toLowerCase();
+        const nameMatches = app.displayName.toLowerCase().includes(query);
+        const codeMatches = app.displayCode.toLowerCase().includes(query);
+        const slotMatches = (app.time_slot || '').toLowerCase().includes(query);
+        if (!nameMatches && !codeMatches && !slotMatches) return false;
+      }
+
+      // Tab matching
+      if (activeTab === 'all') return true;
+      if (activeTab === 'waiting') return app.status === 'checked_in' || app.status === 'checkedIn';
+      if (activeTab === 'in_progress') return app.status === 'in_progress';
+      if (activeTab === 'completed') return app.status === 'completed';
+      if (activeTab === 'scheduled') {
+        return app.status === 'scheduled' || app.status === 'booked' || app.status === 'pending';
+      }
+
+      return true;
+    });
+  }, [normalizedAppointments, searchTerm, activeTab]);
+
+  // Status badge matching Lab Orders design system
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'in_progress':
+        return (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-spin"></span>
+            In Consultation
+          </span>
+        );
+      case 'checked_in':
+      case 'checkedIn':
+        return (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+            Waiting Room
+          </span>
+        );
+      case 'completed':
+        return (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200 gap-1.5">
+            <CheckCircle className="w-3.5 h-3.5 text-purple-600" />
+            Completed
+          </span>
+        );
+      case 'scheduled':
+      case 'booked':
+      case 'pending':
+      default:
+        return (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200 gap-1.5">
+            <Clock className="w-3.5 h-3.5 text-slate-500" />
+            Scheduled
+          </span>
+        );
     }
   };
 
-  const filteredAppointments = appointments.filter(appointment => {
-    const matchesSearch = appointment.patient_name?.toLowerCase().includes(searchTerm.toLowerCase());
-
-    let matchesTab = true;
-    if (activeTab === 'all') { matchesTab = ["booked", "scheduled", "pending", "checked_in", "checkedIn", "in_progress", "completed"].includes(appointment.status) }
-    else if (activeTab === 'checkedIn') matchesTab = appointment.status === 'checked_in' || appointment.status === 'checkedIn';
-
-    return matchesSearch && matchesTab;
-  });
+  const getActiveTabTitle = () => {
+    switch (activeTab) {
+      case 'waiting':
+        return 'Waiting Room Patients';
+      case 'in_progress':
+        return 'Active Consultations';
+      case 'completed':
+        return 'Completed Consultations';
+      case 'scheduled':
+        return 'Scheduled Appointments';
+      case 'all':
+      default:
+        return "Today's Patient Queue";
+    }
+  };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Doctor's Appointments</h1>
-            <p className="text-gray-600 mt-1">View today's queue and start consultations</p>
+    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+      {/* ─────────────────────────────────────────────────────────────
+         1. CLEAN HEADER CARD (Consistent with Lab Orders design system)
+      ───────────────────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <div>
+          <div className="flex items-center space-x-2 text-blue-600 mb-1">
+            <Calendar className="w-5 h-5" />
+            <span className="text-xs font-semibold uppercase tracking-wider">Doctor OPD Queue</span>
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Today's Appointments</h1>
+          <p className="text-slate-500 text-sm mt-0.5">
+            Manage today's patient queue, track waiting room arrivals, and start consultations
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            id="btn-refresh-doctor-queue"
+            onClick={fetchDailyAppointments}
+            disabled={isLoading}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors disabled:opacity-50"
+            title="Refresh appointments list"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-blue-600' : ''}`} />
+            <span>Refresh Queue</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ─────────────────────────────────────────────────────────────
+         2. SEARCH & FILTER BAR (Matching Lab Orders Search / Tabs)
+      ───────────────────────────────────────────────────────────── */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              id="input-search-appointments"
+              type="text"
+              placeholder="Search patients by name, patient code, or slot time..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-colors"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Search and Filters */}
-        <div className="bg-white/70 backdrop-blur-lg rounded-2xl shadow-sm p-5 mb-6 border border-white/80">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-grow max-w-2xl">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <Search className="h-5 w-5 text-slate-400" />
-              </div>
-              <input
-                type="text"
-                placeholder="Search patients..."
-                className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all shadow-sm"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="bg-white/70 backdrop-blur-lg rounded-2xl shadow-sm overflow-hidden border border-white/80 mb-6">
-          <div className="flex border-b border-gray-200/50">
+        {/* Status Tabs */}
+        <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
             <button
+              id="tab-all-appointments"
               onClick={() => setActiveTab('all')}
-              className={`flex-1 py-3 px-4 text-center font-medium text-sm transition-colors ${activeTab === 'all' ? 'text-blue-600 border-b-2 border-blue-500' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50/50'}`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                activeTab === 'all'
+                  ? 'bg-blue-50 text-blue-700 border border-blue-200/60'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
             >
-              Today's Queue
+              <span>All Today</span>
+              <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-slate-100 text-slate-600 font-bold">
+                {counts.all}
+              </span>
             </button>
+
             <button
-              onClick={() => setActiveTab('checkedIn')}
-              className={`flex-1 py-3 px-4 text-center font-medium text-sm transition-colors ${activeTab === 'checkedIn' ? 'text-blue-600 border-b-2 border-blue-500' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50/50'}`}
+              id="tab-waiting-appointments"
+              onClick={() => setActiveTab('waiting')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                activeTab === 'waiting'
+                  ? 'bg-blue-50 text-blue-700 border border-blue-200/60'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
             >
-              Waiting Room (Checked In)
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+              <span>Waiting Room</span>
+              <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-blue-100 text-blue-800 font-bold">
+                {counts.waiting}
+              </span>
+            </button>
+
+            <button
+              id="tab-inprogress-appointments"
+              onClick={() => setActiveTab('in_progress')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                activeTab === 'in_progress'
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-spin"></span>
+              <span>In Consultation</span>
+              <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-emerald-100 text-emerald-800 font-bold">
+                {counts.inProgress}
+              </span>
+            </button>
+
+            <button
+              id="tab-scheduled-appointments"
+              onClick={() => setActiveTab('scheduled')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                activeTab === 'scheduled'
+                  ? 'bg-slate-200 text-slate-800 border border-slate-300'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5 text-slate-500" />
+              <span>Scheduled</span>
+              <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-slate-100 text-slate-600 font-bold">
+                {counts.scheduled}
+              </span>
+            </button>
+
+            <button
+              id="tab-completed-appointments"
+              onClick={() => setActiveTab('completed')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                activeTab === 'completed'
+                  ? 'bg-purple-50 text-purple-700 border border-purple-200/60'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <CheckCircle className="w-3.5 h-3.5 text-purple-600" />
+              <span>Completed</span>
+              <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-purple-100 text-purple-800 font-bold">
+                {counts.completed}
+              </span>
             </button>
           </div>
         </div>
+      </div>
 
-        {/* Appointments List */}
-        <div className="bg-white/70 backdrop-blur-lg rounded-2xl shadow-sm overflow-hidden border border-white/80">
-          <div className="p-5 border-b border-gray-200/50">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-800">
-                {activeTab === 'all' && 'All Appointments'}
-                {activeTab === 'checkedIn' && 'Waiting Room'}
-              </h3>
-              <div className="text-xs text-blue-600 font-medium bg-blue-100/30 px-3 py-1.5 rounded-full border border-blue-200/50">
-                {filteredAppointments.length} {filteredAppointments.length === 1 ? 'patient' : 'patients'}
-              </div>
-            </div>
+      {/* ─────────────────────────────────────────────────────────────
+         3. APPOINTMENTS LIST / CARDS (Consistent with Lab Orders Table Card)
+      ───────────────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        {/* Card Header */}
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-bold text-slate-800">{getActiveTabTitle()}</h3>
+            <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
+              {filteredAppointments.length} {filteredAppointments.length === 1 ? 'patient' : 'patients'}
+            </span>
           </div>
+        </div>
 
-          <div className="divide-y divide-gray-200/30">
-            {filteredAppointments.length > 0 ? (
-              filteredAppointments.map((appointment) => (
+        {/* Content list */}
+        <div className="divide-y divide-slate-100">
+          {filteredAppointments.length > 0 ? (
+            filteredAppointments.map((appointment) => {
+              const isInProgress = appointment.status === 'in_progress';
+              const isCheckedIn = appointment.status === 'checked_in' || appointment.status === 'checkedIn';
+              const isCompleted = appointment.status === 'completed';
+
+              return (
                 <div
                   key={appointment.appointment_id}
-                  className={`relative transition-all duration-200 hover:bg-blue-50/10 min-h-[100px]`}
+                  className="p-4 sm:p-5 transition-colors hover:bg-slate-50/70"
                 >
-                  <div className="grid grid-cols-12 gap-4 items-center p-4 md:p-5">
-
-                    {/* Patient Column */}
-                    <div className="col-span-12 md:col-span-4 flex items-center gap-4">
-                      <div className="relative flex-shrink-0">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center border border-white/80 shadow-sm font-bold text-blue-600">
-                          {appointment.queue_number || '-'}
-                        </div>
-                        <span className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white ${statusStyles[appointment.status]?.border || 'border-gray-300'}`}></span>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-800 truncate">{appointment.patient_name}</p>
-                        {appointment.is_emergency && (
-                          <span className="inline-block mt-1 px-2 py-0.5 text-[10px] font-bold bg-rose-100 text-rose-600 rounded-md border border-rose-200">
-                            EMERGENCY
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Time Column */}
-                    <div className="col-span-6 md:col-span-3 border-l border-gray-100 pl-4">
-                      <div className="flex flex-col gap-1">
-                        <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Slot Time</p>
-                        <div className="flex items-center gap-2">
-                          <Clock className="text-blue-500/80 w-4 h-4 flex-shrink-0" />
-                          <span className="text-sm font-bold text-gray-700">
-                            {appointment.time_slot}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Status Column */}
-                    <div className="col-span-6 md:col-span-2 relative">
-                      <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-medium ${statusStyles[appointment.status]?.bg || 'bg-gray-100'} ${statusStyles[appointment.status]?.text || 'text-gray-600'} border ${statusStyles[appointment.status]?.border || 'border-gray-300'}`}>
-                        {statusStyles[appointment.status]?.icon || <Clock className="w-4 h-4" />}
-                        {appointment.status?.replace('_', ' ').toUpperCase()}
-                      </div>
-                    </div>
-
-                    {/* Actions Column */}
-                    <div className="col-span-12 md:col-span-3 flex justify-end">
-                      {(appointment.status === 'checkedIn' || appointment.status === 'checked_in' || appointment.status === 'in_progress') ? (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/doctor-dashboard/consultation/${appointment.appointment_id}`);
-                          }}
-                          className={`w-full md:w-auto px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg transition-all flex items-center justify-center gap-2 ${
-                            appointment.status === 'in_progress' 
-                              ? 'bg-gradient-to-r from-emerald-600 to-teal-600 shadow-emerald-500/30 hover:shadow-emerald-500/40' 
-                              : 'bg-gradient-to-r from-blue-600 to-indigo-600 shadow-blue-500/30 hover:shadow-blue-500/40'
-                          } hover:scale-[1.02]`}
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                    {/* Patient & Queue Token Column (5 cols) */}
+                    <div className="md:col-span-5 flex items-center gap-3.5">
+                      {/* Queue sequence token badge */}
+                      <div className="relative shrink-0">
+                        <div
+                          className={`w-11 h-11 rounded-xl flex flex-col items-center justify-center font-bold text-xs border shadow-xs ${
+                            isInProgress
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : isCheckedIn
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : isCompleted
+                              ? 'bg-purple-50 text-purple-700 border-purple-200'
+                              : 'bg-slate-100 text-slate-700 border-slate-200'
+                          }`}
                         >
-                          <Stethoscope size={16} />
-                          {appointment.status === 'in_progress' ? 'Resume Consult' : 'Start Consult'}
+                          <span className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold leading-none">Queue</span>
+                          <span className="text-sm font-black leading-none mt-0.5">#{appointment.sequential_queue}</span>
+                        </div>
+                      </div>
+
+                      {/* Patient details */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-bold text-slate-900 truncate">
+                            {appointment.displayName}
+                          </p>
+                          {appointment.displayCode && appointment.displayCode !== 'N/A' && (
+                            <span className="font-mono text-xs text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 font-semibold">
+                              {appointment.displayCode}
+                            </span>
+                          )}
+                          {appointment.is_emergency && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold bg-rose-50 text-rose-700 rounded-md border border-rose-200">
+                              <AlertTriangle className="w-3 h-3 text-rose-600" />
+                              EMERGENCY
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Slot Time Column (2 cols) */}
+                    <div className="md:col-span-2">
+                      <div className="flex items-center gap-1.5 text-xs text-slate-700">
+                        <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="font-semibold">{appointment.time_slot || 'Regular Slot'}</span>
+                      </div>
+                    </div>
+
+                    {/* Status Column (2 cols) */}
+                    <div className="md:col-span-2">
+                      {getStatusBadge(appointment.status)}
+                    </div>
+
+                    {/* Actions Column (3 cols) */}
+                    <div className="md:col-span-3 flex items-center justify-start md:justify-end gap-2">
+                      {isInProgress ? (
+                        <button
+                          type="button"
+                          id={`btn-resume-consult-${appointment.appointment_id}`}
+                          onClick={() => router.push(`/doctor-dashboard/consultation/${appointment.appointment_id}`)}
+                          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-all active:scale-95 cursor-pointer"
+                        >
+                          <Stethoscope className="w-3.5 h-3.5" />
+                          <span>Resume Consult</span>
                         </button>
-                      ) : appointment.status === 'completed' ? (
-                        <div className="px-4 py-2 bg-gray-50 border border-gray-200 text-gray-500 rounded-xl text-xs font-bold flex items-center gap-2">
-                          <CheckCircle size={14} />
-                          Completed
-                        </div>
+                      ) : isCheckedIn ? (
+                        <button
+                          type="button"
+                          id={`btn-start-consult-${appointment.appointment_id}`}
+                          onClick={() => router.push(`/doctor-dashboard/consultation/${appointment.appointment_id}`)}
+                          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-all active:scale-95 cursor-pointer"
+                        >
+                          <Stethoscope className="w-3.5 h-3.5" />
+                          <span>Start Consult</span>
+                        </button>
+                      ) : isCompleted ? (
+                        <button
+                          type="button"
+                          id={`btn-view-summary-${appointment.appointment_id}`}
+                          onClick={() => router.push(`/doctor-dashboard/consultation/${appointment.appointment_id}`)}
+                          className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-colors"
+                        >
+                          <CheckCircle className="w-3.5 h-3.5 text-purple-600" />
+                          <span>View Summary</span>
+                        </button>
                       ) : (
-                        <div className="text-xs text-gray-400 italic">
-                          Waiting for Reception...
-                        </div>
+                        <button
+                          type="button"
+                          id={`btn-consult-early-${appointment.appointment_id}`}
+                          onClick={() => router.push(`/doctor-dashboard/consultation/${appointment.appointment_id}`)}
+                          className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-colors"
+                          title="Open consultation directly"
+                        >
+                          <Stethoscope className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Consult</span>
+                        </button>
                       )}
                     </div>
                   </div>
                 </div>
-              ))
-            ) : (
-              <div className="p-8 text-center text-gray-500">
-                No appointments found for today.
+              );
+            })
+          ) : (
+            <div className="p-12 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+                <Search className="w-5 h-5" />
               </div>
-            )}
-          </div>
+              <h4 className="text-sm font-bold text-slate-800">No appointments found</h4>
+              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                {searchTerm
+                  ? `No patients match the search "${searchTerm}".`
+                  : activeTab === 'waiting'
+                  ? 'No patients are currently in the waiting room.'
+                  : activeTab === 'in_progress'
+                  ? 'No consultations are currently in progress.'
+                  : activeTab === 'completed'
+                  ? 'No appointments have been completed yet today.'
+                  : 'There are no appointments scheduled for today.'}
+              </p>
+            </div>
+          )}
         </div>
       </div>
+    </div>
   );
 };
 

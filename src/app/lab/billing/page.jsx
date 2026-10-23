@@ -556,7 +556,7 @@ export default function LabBillingPage() {
           ) : (
             <table className="w-full text-left text-xs text-slate-600 border-collapse">
               <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/70 text-[11px] text-slate-400 uppercase font-semibold">
+                <tr className="border-b border-slate-300 bg-slate-100/90 text-[11px] text-slate-900 uppercase font-bold">
                   <th className="py-3 px-4">Invoice / Date</th>
                   <th className="py-3 px-4">Patient / MRN</th>
                   <th className="py-3 px-4">Order Ref</th>
@@ -921,7 +921,7 @@ export default function LabBillingPage() {
                 <h4 className="font-bold text-slate-800 text-xs mb-2">Itemized Diagnostic Services</h4>
                 <div className="border border-slate-200 rounded-xl overflow-hidden">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-semibold text-slate-400 uppercase">
+                    <thead className="bg-slate-100/90 border-b border-slate-300 text-[11px] font-bold text-slate-900 uppercase">
                       <tr>
                         <th className="py-2.5 px-3">Service / Test Description</th>
                         <th className="py-2.5 px-3">Code</th>
@@ -1015,7 +1015,7 @@ export default function LabBillingPage() {
                 {Array.isArray(selectedInvoice.payments) && selectedInvoice.payments.length > 0 ? (
                   <div className="border border-slate-200 rounded-xl overflow-hidden">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-semibold text-slate-400 uppercase">
+                      <thead className="bg-slate-100/90 border-b border-slate-300 text-[11px] font-bold text-slate-900 uppercase">
                         <tr>
                           <th className="py-2.5 px-3">Receipt / Ref #</th>
                           <th className="py-2.5 px-3">Payment Date</th>

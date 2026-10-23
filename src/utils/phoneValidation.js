@@ -1,7 +1,30 @@
 export const PHONE_REGEX = /^[0-9]{10}$/;
+export const INDIAN_MOBILE_REGEX = /^[6-9]\d{9}$/;
 
 /**
- * Validates whether a phone number is exactly 10 numeric digits (0-9).
+ * Normalizes phone number input by safely trimming whitespace,
+ * stripping country code (+91 / 91) or leading zero when a valid 10-digit Indian number follows,
+ * and filtering to digits.
+ */
+export const normalizePhoneNumber = (phone) => {
+  if (phone === null || phone === undefined) return '';
+  let str = String(phone).trim();
+  if (str.startsWith('+91')) {
+    str = str.slice(3).trim();
+  }
+  const digits = str.replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91') && /^[6-9]/.test(digits.slice(2))) {
+    return digits.slice(2);
+  }
+  if (digits.length === 11 && digits.startsWith('0') && /^[6-9]/.test(digits.slice(1))) {
+    return digits.slice(1);
+  }
+  return digits;
+};
+
+/**
+ * Validates whether a phone number is exactly 10 numeric digits (0-9)
+ * and conforms to Indian mobile numbering rules (starts with 6, 7, 8, or 9).
  * Returns null if valid (or empty when optional), or an error string if invalid.
  */
 export const validatePhoneNumber = (phone, isRequired = false, fieldName = 'Phone number') => {
@@ -18,18 +41,23 @@ export const validatePhoneNumber = (phone, isRequired = false, fieldName = 'Phon
 
   // Reject if length is not exactly 10
   if (strVal.length !== 10) {
-    return `${fieldName} must be exactly 10 numeric digits`;
+    return `${fieldName} must be exactly 10 digits`;
+  }
+
+  // Reject if does not start with 6, 7, 8, or 9
+  if (!/^[6-9]/.test(strVal)) {
+    return 'Please enter a valid 10-digit Indian phone number starting with 6, 7, 8, or 9';
   }
 
   return null;
 };
 
 /**
- * Checks if a string is a valid 10-digit phone number.
+ * Checks if a string is a valid 10-digit Indian mobile number.
  */
 export const isValidPhoneNumber = (phone) => {
   if (!phone) return false;
-  return PHONE_REGEX.test(String(phone).trim());
+  return INDIAN_MOBILE_REGEX.test(String(phone).trim());
 };
 
 /**

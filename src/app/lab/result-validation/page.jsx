@@ -357,7 +357,7 @@ export default function ResultValidationPage() {
                   {/* Parameter Preview Table */}
                   <div className="mt-3 overflow-x-auto">
                     <table className="w-full text-left text-xs">
-                      <thead className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                      <thead className="bg-slate-100/90 border-b border-slate-300 text-[11px] font-bold text-slate-900 uppercase tracking-wider">
                         <tr>
                           <th className="py-2 px-3">Test Parameter</th>
                           <th className="py-2 px-3">Measured Value</th>

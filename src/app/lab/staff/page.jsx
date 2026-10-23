@@ -615,8 +615,14 @@ export default function LabStaffPage() {
 
       {/* Add / Edit Staff Modal */}
       <ModalPortal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-        <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-2xl w-full flex flex-col max-h-[88vh] my-auto overflow-hidden animate-in zoom-in-95 duration-200">
+        <div 
+          onClick={() => setIsModalOpen(false)}
+          className="fixed inset-0 z-[100] overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-2xl w-full flex flex-col max-h-[88vh] my-auto overflow-hidden animate-in zoom-in-95 duration-200"
+          >
             {/* Modal Header */}
             <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <div className="flex items-center gap-2">

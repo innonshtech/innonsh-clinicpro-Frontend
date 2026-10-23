@@ -11,12 +11,14 @@ import {
   AlertCircle,
   Stethoscope,
   Filter,
-  CheckCircle2
+  CheckCircle2,
+  Thermometer,
+  Wind
 } from 'lucide-react';
 
 /**
  * VitalsTrendChart
- * Compact historical trend chart for IPD patient vitals.
+ * Prominent, clinical historical trend chart for IPD patient vitals.
  * Plots timestamped BP, pulse, temperature, SpO2, and respiratory rate.
  * Distinguishes Nurse Observations from Doctor Rounds.
  * Never charts absent values as zero.
@@ -137,13 +139,13 @@ export default function VitalsTrendChart({ vitalsHistory = [], admissionId = '' 
     });
   }, [filteredReadings]);
 
-  // Helper to compute min/max scaling for a metric
-  const getScale = (accessor, defaultMin, defaultMax) => {
+  // Metric-specific min/max scales for single metric views
+  const getScale = (accessor, defaultMin, defaultMax, minPadding = 5) => {
     const valid = chartPoints.map(accessor).filter(val => val !== null && !isNaN(val));
     if (valid.length === 0) return { min: defaultMin, max: defaultMax, hasData: false };
     const minVal = Math.min(...valid);
     const maxVal = Math.max(...valid);
-    const padding = (maxVal - minVal) * 0.15 || 5;
+    const padding = (maxVal - minVal) * 0.15 || minPadding;
     return {
       min: Math.floor(Math.max(0, minVal - padding)),
       max: Math.ceil(maxVal + padding),
@@ -163,18 +165,37 @@ export default function VitalsTrendChart({ vitalsHistory = [], admissionId = '' 
     };
   }, [chartPoints]);
 
-  const pulseScale = useMemo(() => getScale(p => p.pulse, 40, 150), [chartPoints]);
-  const tempScale = useMemo(() => getScale(p => p.temp, 35, 41), [chartPoints]);
-  const spo2Scale = useMemo(() => getScale(p => p.spo2, 85, 100), [chartPoints]);
-  const rrScale = useMemo(() => getScale(p => p.rr, 10, 35), [chartPoints]);
+  const pulseScale = useMemo(() => getScale(p => p.pulse, 40, 160, 8), [chartPoints]);
+  const tempScale = useMemo(() => {
+    const valid = chartPoints.map(p => p.temp).filter(v => v !== null);
+    if (valid.length === 0) return { min: 35.0, max: 41.0, hasData: false };
+    const minVal = Math.min(...valid);
+    const maxVal = Math.max(...valid);
+    return {
+      min: Math.max(25, Number((minVal - 0.5).toFixed(1))),
+      max: Math.min(55, Number((maxVal + 0.5).toFixed(1))),
+      hasData: true
+    };
+  }, [chartPoints]);
+  const spo2Scale = useMemo(() => {
+    const valid = chartPoints.map(p => p.spo2).filter(v => v !== null);
+    if (valid.length === 0) return { min: 85, max: 100, hasData: false };
+    const minVal = Math.min(...valid);
+    return {
+      min: Math.max(20, Math.floor(minVal - 3)),
+      max: 100,
+      hasData: true
+    };
+  }, [chartPoints]);
+  const rrScale = useMemo(() => getScale(p => p.rr, 8, 36, 4), [chartPoints]);
 
-  // SVG Chart dimensions
-  const chartWidth = 720;
-  const chartHeight = 220;
-  const padLeft = 45;
-  const padRight = 25;
-  const padTop = 20;
-  const padBottom = 35;
+  // Chart coordinate geometry
+  const chartWidth = 920;
+  const chartHeight = 290;
+  const padLeft = 55;
+  const padRight = 35;
+  const padTop = 25;
+  const padBottom = 40;
   const innerWidth = chartWidth - padLeft - padRight;
   const innerHeight = chartHeight - padTop - padBottom;
 
@@ -183,26 +204,69 @@ export default function VitalsTrendChart({ vitalsHistory = [], admissionId = '' 
     return padLeft + (index / (total - 1)) * innerWidth;
   };
 
-  const getY = (val, scale) => {
+  // Helper for single metric scaling
+  const getYFromScale = (val, scale) => {
     if (val === null || scale.max === scale.min) return null;
     const ratio = (val - scale.min) / (scale.max - scale.min);
     return padTop + innerHeight - ratio * innerHeight;
   };
 
-  // Build SVG path for valid points without connecting to zero
-  const buildSvgPath = (points, accessor, scale) => {
+  // Helper for multi-series unified physiological alignment
+  const getNormY = (val, minRange, maxRange) => {
+    if (val === null || val === undefined) return null;
+    const clamped = Math.max(minRange, Math.min(maxRange, val));
+    const ratio = (clamped - minRange) / (maxRange - minRange);
+    return padTop + innerHeight - ratio * innerHeight;
+  };
+
+  // Dedicated Y-functions for each metric depending on current view mode
+  const getYPulse = (val) => {
+    if (val === null) return null;
+    return selectedMetric === 'pulse' ? getYFromScale(val, pulseScale) : getNormY(val, 25, 180);
+  };
+
+  const getYSystolic = (val) => {
+    if (val === null) return null;
+    return selectedMetric === 'bp' ? getYFromScale(val, bpScale) : getNormY(val, 50, 220);
+  };
+
+  const getYDiastolic = (val) => {
+    if (val === null) return null;
+    return selectedMetric === 'bp' ? getYFromScale(val, bpScale) : getNormY(val, 30, 140);
+  };
+
+  const getYTemp = (val) => {
+    if (val === null) return null;
+    return selectedMetric === 'temp' ? getYFromScale(val, tempScale) : getNormY(val, 30, 52);
+  };
+
+  const getYSpO2 = (val) => {
+    if (val === null) return null;
+    return selectedMetric === 'spo2' ? getYFromScale(val, spo2Scale) : getNormY(val, 30, 100);
+  };
+
+  const getYRR = (val) => {
+    if (val === null) return null;
+    return selectedMetric === 'rr' ? getYFromScale(val, rrScale) : getNormY(val, 6, 45);
+  };
+
+  // Build SVG path without charting missing values as zero
+  const buildSvgPath = (points, accessor, getYFn) => {
     let d = '';
     let isDrawing = false;
 
     points.forEach((pt, idx) => {
       const val = accessor(pt);
-      if (val === null) {
-        isDrawing = false; // Missing measurement: do NOT drop to zero, lift pen
+      if (val === null || val === undefined) {
+        isDrawing = false; // Lift pen
         return;
       }
       const x = getX(idx, points.length);
-      const y = getY(val, scale);
-      if (y === null) return;
+      const y = getYFn(val);
+      if (y === null || isNaN(y)) {
+        isDrawing = false;
+        return;
+      }
 
       if (!isDrawing) {
         d += `M ${x.toFixed(1)} ${y.toFixed(1)} `;
@@ -215,12 +279,22 @@ export default function VitalsTrendChart({ vitalsHistory = [], admissionId = '' 
     return d;
   };
 
+  // Ticks for Y-Axis when a single metric is selected
+  const activeScale = useMemo(() => {
+    if (selectedMetric === 'bp') return { ...bpScale, unit: 'mmHg' };
+    if (selectedMetric === 'pulse') return { ...pulseScale, unit: 'bpm' };
+    if (selectedMetric === 'temp') return { ...tempScale, unit: '°C' };
+    if (selectedMetric === 'spo2') return { ...spo2Scale, unit: '%' };
+    if (selectedMetric === 'rr') return { ...rrScale, unit: '/min' };
+    return null;
+  }, [selectedMetric, bpScale, pulseScale, tempScale, spo2Scale, rrScale]);
+
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-      {/* Header with Filters */}
-      <div className="px-5 py-3.5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-rose-50 text-rose-600 border border-rose-100">
+    <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+      {/* Header with Title, Time Range and Metric Filters */}
+      <div className="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-slate-50/80 via-white to-blue-50/20">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-xl bg-blue-50 text-blue-600 border border-blue-100/80 shadow-2xs">
             <TrendingUp className="w-4 h-4" />
           </div>
           <div>
@@ -228,26 +302,23 @@ export default function VitalsTrendChart({ vitalsHistory = [], admissionId = '' 
               Vital Signs Trend Analysis
             </h3>
             <p className="text-[11px] text-slate-500">
-              Chronological plotted trajectory across bedside observations & clinical rounds
+              Chronological multi-series physiological trajectory across bedside care & rounds
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Time range selector */}
-          <div className="flex items-center bg-white border border-slate-200 rounded-lg p-0.5 shadow-2xs text-[11px] font-semibold text-slate-600">
-            <span className="px-2 text-slate-400 text-[10px] flex items-center gap-1">
-              <Clock className="w-3 h-3" /> Time Range:
-            </span>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Time range selector: 24H, 48H, 7D, All */}
+          <div className="flex items-center bg-slate-100/80 p-0.5 rounded-xl border border-slate-200/80 text-[11px] font-semibold text-slate-600">
             {['24h', '48h', '7d', 'all'].map(r => (
               <button
                 key={r}
                 type="button"
                 onClick={() => setTimeRange(r)}
-                className={`px-2.5 py-1 rounded-md transition-colors ${
+                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
                   timeRange === r
-                    ? 'bg-blue-600 text-white font-bold'
-                    : 'hover:text-slate-900 hover:bg-slate-50'
+                    ? 'bg-white text-blue-700 font-bold shadow-2xs border border-slate-200/60'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
                 }`}
               >
                 {r.toUpperCase()}
@@ -255,11 +326,11 @@ export default function VitalsTrendChart({ vitalsHistory = [], admissionId = '' 
             ))}
           </div>
 
-          {/* Metric Filter */}
+          {/* Metric Selector Dropdown */}
           <select
             value={selectedMetric}
             onChange={(e) => setSelectedMetric(e.target.value)}
-            className="text-xs font-semibold border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 shadow-2xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            className="text-xs font-semibold border border-slate-200 rounded-xl px-3 py-1.5 bg-white text-slate-700 shadow-2xs focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer"
           >
             <option value="all">All Primary Vitals</option>
             <option value="bp">Blood Pressure (mmHg)</option>
@@ -271,30 +342,66 @@ export default function VitalsTrendChart({ vitalsHistory = [], admissionId = '' 
         </div>
       </div>
 
-      {/* Provenance Legend */}
-      <div className="px-5 py-2 border-b border-slate-100 bg-white flex flex-wrap items-center justify-between gap-3 text-[11px]">
-        <div className="flex items-center gap-4 text-slate-600 font-medium">
-          <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-purple-600 border border-purple-200 inline-block" />
-            <strong className="text-purple-800">Nurse Observation</strong> (Bedside Record)
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-xs bg-blue-600 border border-blue-200 inline-block" />
-            <strong className="text-blue-800">Doctor Round</strong> (Clinical Progress Note)
-          </span>
+      {/* Interactive Legend & Series Guide */}
+      <div className="px-5 py-2.5 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-4 flex-wrap text-[11px]">
+          {(selectedMetric === 'all' || selectedMetric === 'pulse') && (
+            <span className="flex items-center gap-1.5 font-semibold text-rose-700">
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
+              Pulse (bpm)
+            </span>
+          )}
+          {(selectedMetric === 'all' || selectedMetric === 'bp') && (
+            <>
+              <span className="flex items-center gap-1.5 font-semibold text-indigo-700">
+                <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 inline-block" />
+                BP Systolic (mmHg)
+              </span>
+              <span className="flex items-center gap-1.5 font-semibold text-sky-700">
+                <span className="w-2.5 h-1 border-t-2 border-dashed border-sky-500 inline-block" />
+                BP Diastolic (mmHg)
+              </span>
+            </>
+          )}
+          {(selectedMetric === 'all' || selectedMetric === 'temp') && (
+            <span className="flex items-center gap-1.5 font-semibold text-amber-700">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />
+              Temperature (°C)
+            </span>
+          )}
+          {(selectedMetric === 'all' || selectedMetric === 'spo2') && (
+            <span className="flex items-center gap-1.5 font-semibold text-teal-700">
+              <span className="w-2.5 h-2.5 rounded-full bg-teal-500 inline-block" />
+              SpO2 (%)
+            </span>
+          )}
+          {(selectedMetric === 'all' || selectedMetric === 'rr') && (
+            <span className="flex items-center gap-1.5 font-semibold text-purple-700">
+              <span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block" />
+              Resp Rate (/min)
+            </span>
+          )}
         </div>
-        <div className="text-slate-400 text-[10px] italic">
-          * Missing readings remain absent and are never charted as zero
+
+        <div className="flex items-center gap-3 text-[11px] text-slate-500 font-medium">
+          <span className="flex items-center gap-1">
+            <span className="w-2.5 h-2.5 rounded-full bg-purple-600 border border-white shadow-2xs inline-block" />
+            <span>Nurse Bedside Record</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-2.5 h-2.5 rounded-xs bg-blue-600 border border-white shadow-2xs inline-block" />
+            <span>Doctor Round</span>
+          </span>
         </div>
       </div>
 
       {/* Chart Canvas Area */}
       <div className="p-5">
         {chartPoints.length === 0 ? (
-          <div className="py-12 px-4 text-center">
-            <Activity className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+          <div className="py-14 px-4 text-center">
+            <Activity className="w-9 h-9 text-slate-300 mx-auto mb-2.5" />
             <h4 className="text-xs font-bold text-slate-700">No Vital Readings in Selected Range</h4>
-            <p className="text-[11px] text-slate-400 mt-0.5 max-w-sm mx-auto">
+            <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
               {timeRange === 'all'
                 ? 'No vital observations or progress rounds have been recorded for this admission yet.'
                 : `No vital observations found in the last ${timeRange.toUpperCase()}. Select "ALL" to view the full stay history.`}
@@ -306,124 +413,188 @@ export default function VitalsTrendChart({ vitalsHistory = [], admissionId = '' 
             <div className="relative w-full overflow-x-auto">
               <svg
                 viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-                className="w-full h-auto min-w-[560px] select-none"
-                style={{ maxHeight: '280px' }}
+                className="w-full h-auto min-w-[620px] select-none"
+                style={{ maxHeight: '340px' }}
               >
+                <defs>
+                  <linearGradient id="normalBandGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#f8fafc" stopOpacity="0.8" />
+                    <stop offset="100%" stopColor="#f1f5f9" stopOpacity="0.4" />
+                  </linearGradient>
+                </defs>
+
+                {/* Background Normal Band / Guide */}
+                <rect
+                  x={padLeft}
+                  y={padTop + innerHeight * 0.25}
+                  width={innerWidth}
+                  height={innerHeight * 0.5}
+                  fill="url(#normalBandGrad)"
+                  rx="4"
+                />
+
                 {/* Horizontal reference grid lines */}
                 {[0, 0.25, 0.5, 0.75, 1].map((pct, idx) => {
                   const y = padTop + innerHeight * pct;
+                  let tickLabel = null;
+                  if (activeScale && activeScale.hasData) {
+                    const tickVal = Math.round(activeScale.max - pct * (activeScale.max - activeScale.min));
+                    tickLabel = `${tickVal}`;
+                  }
+
                   return (
-                    <line
-                      key={idx}
-                      x1={padLeft}
-                      y1={y}
-                      x2={padLeft + innerWidth}
-                      y2={y}
-                      stroke="#e2e8f0"
-                      strokeDasharray="3 3"
-                      strokeWidth="1"
-                    />
+                    <g key={idx}>
+                      <line
+                        x1={padLeft}
+                        y1={y}
+                        x2={padLeft + innerWidth}
+                        y2={y}
+                        stroke="#e2e8f0"
+                        strokeDasharray={pct === 1 ? 'none' : '3 3'}
+                        strokeWidth={pct === 1 ? '1.5' : '1'}
+                      />
+                      {tickLabel && (
+                        <text
+                          x={padLeft - 8}
+                          y={y + 3.5}
+                          textAnchor="end"
+                          fontSize="9"
+                          fill="#64748b"
+                          fontFamily="monospace"
+                          fontWeight="600"
+                        >
+                          {tickLabel}
+                        </text>
+                      )}
+                    </g>
                   );
                 })}
 
-                {/* X-Axis baseline */}
-                <line
-                  x1={padLeft}
-                  y1={padTop + innerHeight}
-                  x2={padLeft + innerWidth}
-                  y2={padTop + innerHeight}
-                  stroke="#cbd5e1"
-                  strokeWidth="1.5"
-                />
-
-                {/* Plot: Blood Pressure (Systolic & Diastolic) */}
-                {(selectedMetric === 'all' || selectedMetric === 'bp') && bpScale.hasData && (
-                  <>
-                    {/* Systolic Line */}
-                    <path
-                      d={buildSvgPath(chartPoints, p => p.systolic, bpScale)}
-                      fill="none"
-                      stroke="#ef4444"
-                      strokeWidth="2.2"
-                      strokeLinecap="round"
-                    />
-                    {/* Diastolic Line */}
-                    <path
-                      d={buildSvgPath(chartPoints, p => p.diastolic, bpScale)}
-                      fill="none"
-                      stroke="#f97316"
-                      strokeWidth="2"
-                      strokeDasharray="4 2"
-                      strokeLinecap="round"
-                    />
-                  </>
+                {/* Y-Axis unit label if single metric is active */}
+                {activeScale && (
+                  <text
+                    x={padLeft - 8}
+                    y={padTop - 8}
+                    textAnchor="end"
+                    fontSize="9"
+                    fill="#94a3b8"
+                    fontWeight="700"
+                  >
+                    {activeScale.unit}
+                  </text>
                 )}
 
-                {/* Plot: Pulse (Heart Rate) */}
-                {(selectedMetric === 'all' || selectedMetric === 'pulse') && pulseScale.hasData && (
-                  <path
-                    d={buildSvgPath(chartPoints, p => p.pulse, pulseScale)}
-                    fill="none"
-                    stroke="#ec4899"
-                    strokeWidth="2"
-                    strokeLinecap="round"
+                {/* Vertical hover line indicator */}
+                {hoveredPoint && (
+                  <line
+                    x1={getX(hoveredPoint.index, chartPoints.length)}
+                    y1={padTop}
+                    x2={getX(hoveredPoint.index, chartPoints.length)}
+                    y2={padTop + innerHeight}
+                    stroke="#94a3b8"
+                    strokeDasharray="3 3"
+                    strokeWidth="1.5"
                   />
                 )}
 
-                {/* Plot: Temperature */}
-                {(selectedMetric === 'all' || selectedMetric === 'temp') && tempScale.hasData && (
+                {/* 1. Pulse Series (Rose) */}
+                {(selectedMetric === 'all' || selectedMetric === 'pulse') && (
                   <path
-                    d={buildSvgPath(chartPoints, p => p.temp, tempScale)}
+                    d={buildSvgPath(chartPoints, p => p.pulse, getYPulse)}
+                    fill="none"
+                    stroke="#f43f5e"
+                    strokeWidth="2.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                )}
+
+                {/* 2. BP Systolic Series (Indigo) */}
+                {(selectedMetric === 'all' || selectedMetric === 'bp') && (
+                  <path
+                    d={buildSvgPath(chartPoints, p => p.systolic, getYSystolic)}
+                    fill="none"
+                    stroke="#6366f1"
+                    strokeWidth="2.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                )}
+
+                {/* 3. BP Diastolic Series (Sky Dashed) */}
+                {(selectedMetric === 'all' || selectedMetric === 'bp') && (
+                  <path
+                    d={buildSvgPath(chartPoints, p => p.diastolic, getYDiastolic)}
+                    fill="none"
+                    stroke="#38bdf8"
+                    strokeWidth="2"
+                    strokeDasharray="4 3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                )}
+
+                {/* 4. Temperature Series (Amber) */}
+                {(selectedMetric === 'all' || selectedMetric === 'temp') && (
+                  <path
+                    d={buildSvgPath(chartPoints, p => p.temp, getYTemp)}
                     fill="none"
                     stroke="#f59e0b"
-                    strokeWidth="2"
+                    strokeWidth="2.2"
                     strokeLinecap="round"
+                    strokeLinejoin="round"
                   />
                 )}
 
-                {/* Plot: SpO2 */}
-                {(selectedMetric === 'all' || selectedMetric === 'spo2') && spo2Scale.hasData && (
+                {/* 5. SpO2 Series (Teal) */}
+                {(selectedMetric === 'all' || selectedMetric === 'spo2') && (
                   <path
-                    d={buildSvgPath(chartPoints, p => p.spo2, spo2Scale)}
+                    d={buildSvgPath(chartPoints, p => p.spo2, getYSpO2)}
                     fill="none"
-                    stroke="#06b6d4"
-                    strokeWidth="2"
+                    stroke="#14b8a6"
+                    strokeWidth="2.2"
                     strokeLinecap="round"
+                    strokeLinejoin="round"
                   />
                 )}
 
-                {/* Plot: Respiratory Rate */}
-                {(selectedMetric === 'rr') && rrScale.hasData && (
+                {/* 6. Respiratory Rate Series (Purple) */}
+                {(selectedMetric === 'all' || selectedMetric === 'rr') && (
                   <path
-                    d={buildSvgPath(chartPoints, p => p.rr, rrScale)}
+                    d={buildSvgPath(chartPoints, p => p.rr, getYRR)}
                     fill="none"
-                    stroke="#8b5cf6"
+                    stroke="#a855f7"
                     strokeWidth="2"
                     strokeLinecap="round"
+                    strokeLinejoin="round"
                   />
                 )}
 
-                {/* Data Points with Provenance Shapes */}
+                {/* Render distinct Data Points with Provenance shapes on the primary active line */}
                 {chartPoints.map((pt, idx) => {
                   const x = getX(idx, chartPoints.length);
-
-                  // Calculate primary Y for dot placement based on current view
-                  let primaryVal = null;
-                  let primaryScale = bpScale;
-                  if (selectedMetric === 'pulse') { primaryVal = pt.pulse; primaryScale = pulseScale; }
-                  else if (selectedMetric === 'temp') { primaryVal = pt.temp; primaryScale = tempScale; }
-                  else if (selectedMetric === 'spo2') { primaryVal = pt.spo2; primaryScale = spo2Scale; }
-                  else if (selectedMetric === 'rr') { primaryVal = pt.rr; primaryScale = rrScale; }
-                  else {
-                    // All: prioritize systolic or pulse
-                    primaryVal = pt.systolic !== null ? pt.systolic : (pt.pulse !== null ? pt.pulse : (pt.temp !== null ? pt.temp : pt.spo2));
-                    primaryScale = pt.systolic !== null ? bpScale : (pt.pulse !== null ? pulseScale : (pt.temp !== null ? tempScale : spo2Scale));
-                  }
-
-                  const y = getY(primaryVal, primaryScale);
-                  if (y === null) return null;
-
                   const isHovered = hoveredPoint?.id === pt.id;
+
+                  // Find metric points available for this timestamp
+                  const dots = [];
+                  if ((selectedMetric === 'all' || selectedMetric === 'pulse') && pt.pulse !== null) {
+                    dots.push({ y: getYPulse(pt.pulse), color: '#f43f5e' });
+                  }
+                  if ((selectedMetric === 'all' || selectedMetric === 'bp') && pt.systolic !== null) {
+                    dots.push({ y: getYSystolic(pt.systolic), color: '#6366f1' });
+                  }
+                  if ((selectedMetric === 'all' || selectedMetric === 'bp') && pt.diastolic !== null) {
+                    dots.push({ y: getYDiastolic(pt.diastolic), color: '#38bdf8' });
+                  }
+                  if ((selectedMetric === 'all' || selectedMetric === 'temp') && pt.temp !== null) {
+                    dots.push({ y: getYTemp(pt.temp), color: '#f59e0b' });
+                  }
+                  if ((selectedMetric === 'all' || selectedMetric === 'spo2') && pt.spo2 !== null) {
+                    dots.push({ y: getYSpO2(pt.spo2), color: '#14b8a6' });
+                  }
+                  if ((selectedMetric === 'all' || selectedMetric === 'rr') && pt.rr !== null) {
+                    dots.push({ y: getYRR(pt.rr), color: '#a855f7' });
+                  }
 
                   return (
                     <g
@@ -432,48 +603,59 @@ export default function VitalsTrendChart({ vitalsHistory = [], admissionId = '' 
                       onMouseEnter={() => setHoveredPoint(pt)}
                       onMouseLeave={() => setHoveredPoint(null)}
                     >
-                      {/* Interactive Target */}
-                      <circle cx={x} cy={y} r="10" fill="transparent" />
+                      {/* Generous invisible vertical touch/hover strip */}
+                      <rect
+                        x={x - (innerWidth / Math.max(1, chartPoints.length)) / 2}
+                        y={padTop}
+                        width={innerWidth / Math.max(1, chartPoints.length)}
+                        height={innerHeight}
+                        fill="transparent"
+                      />
 
-                      {/* Nurse Observation: Circle; Doctor Round: Square/Diamond */}
-                      {pt.isNurse ? (
-                        <circle
-                          cx={x}
-                          cy={y}
-                          r={isHovered ? 5.5 : 4}
-                          fill="#8b5cf6"
-                          stroke="#ffffff"
-                          strokeWidth="1.8"
-                          className="transition-all"
-                        />
-                      ) : (
-                        <rect
-                          x={x - (isHovered ? 5 : 3.5)}
-                          y={y - (isHovered ? 5 : 3.5)}
-                          width={isHovered ? 10 : 7}
-                          height={isHovered ? 10 : 7}
-                          fill="#2563eb"
-                          stroke="#ffffff"
-                          strokeWidth="1.8"
-                          className="transition-all"
-                        />
-                      )}
+                      {/* Render each metric's dot */}
+                      {dots.map((dot, dIdx) => {
+                        if (dot.y === null) return null;
+                        return pt.isNurse ? (
+                          <circle
+                            key={dIdx}
+                            cx={x}
+                            cy={dot.y}
+                            r={isHovered ? 5.5 : 4}
+                            fill={dot.color}
+                            stroke="#ffffff"
+                            strokeWidth="2"
+                            className="transition-all"
+                          />
+                        ) : (
+                          <rect
+                            key={dIdx}
+                            x={x - (isHovered ? 5 : 3.5)}
+                            y={dot.y - (isHovered ? 5 : 3.5)}
+                            width={isHovered ? 10 : 7}
+                            height={isHovered ? 10 : 7}
+                            fill={dot.color}
+                            stroke="#ffffff"
+                            strokeWidth="2"
+                            className="transition-all"
+                          />
+                        );
+                      })}
 
-                      {/* X-Axis Timestamp Label */}
+                      {/* X-Axis Timestamp Labels */}
                       <text
                         x={x}
-                        y={padTop + innerHeight + 14}
+                        y={padTop + innerHeight + 15}
                         textAnchor="middle"
                         fontSize="9"
-                        fill="#64748b"
+                        fill={isHovered ? '#1e293b' : '#64748b'}
                         fontFamily="monospace"
-                        fontWeight="600"
+                        fontWeight={isHovered ? '700' : '600'}
                       >
                         {pt.timeLabel}
                       </text>
                       <text
                         x={x}
-                        y={padTop + innerHeight + 25}
+                        y={padTop + innerHeight + 27}
                         textAnchor="middle"
                         fontSize="8"
                         fill="#94a3b8"
@@ -486,13 +668,13 @@ export default function VitalsTrendChart({ vitalsHistory = [], admissionId = '' 
               </svg>
             </div>
 
-            {/* Hovered / Selected Detail Card */}
+            {/* Hovered Observation Tooltip Card */}
             {hoveredPoint ? (
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1.5 animate-in fade-in duration-150">
-                <div className="flex items-center justify-between border-b border-slate-200/60 pb-1.5">
+              <div className="p-3.5 bg-gradient-to-r from-slate-50 via-white to-blue-50/30 border border-slate-200 rounded-2xl text-xs space-y-2 shadow-xs transition-all">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                   <div className="flex items-center gap-2">
                     <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                         hoveredPoint.isNurse
                           ? 'bg-purple-100 text-purple-700 border border-purple-200'
                           : 'bg-blue-100 text-blue-700 border border-blue-200'
@@ -500,45 +682,57 @@ export default function VitalsTrendChart({ vitalsHistory = [], admissionId = '' 
                     >
                       {hoveredPoint.sourceType}
                     </span>
-                    <span className="font-semibold text-slate-800">{hoveredPoint.clinician}</span>
+                    <span className="font-bold text-slate-800">{hoveredPoint.clinician}</span>
                   </div>
-                  <span className="font-mono text-slate-500 text-[11px]">
-                    {hoveredPoint.dateLabel} • {hoveredPoint.timeLabel}
+                  <span className="font-mono text-slate-500 text-[11px] font-semibold">
+                    {hoveredPoint.dateLabel} at {hoveredPoint.timeLabel}
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-0.5 text-[11px] font-mono">
-                  <div className="bg-white p-2 rounded-lg border border-slate-200/80">
-                    <span className="text-[10px] text-slate-500 block uppercase">Blood Pressure</span>
-                    <strong className="text-slate-900 font-bold">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-0.5 text-[11px]">
+                  <div className="bg-white p-2 rounded-xl border border-slate-200/80 shadow-2xs">
+                    <span className="text-[10px] text-slate-400 font-semibold block uppercase">Blood Pressure</span>
+                    <strong className="text-slate-900 font-extrabold text-xs">
                       {hoveredPoint.systolic && hoveredPoint.diastolic
                         ? `${hoveredPoint.systolic}/${hoveredPoint.diastolic} mmHg`
-                        : (hoveredPoint.systolic ? `${hoveredPoint.systolic}/— mmHg` : 'Not recorded')}
+                        : (hoveredPoint.systolic ? `${hoveredPoint.systolic}/— mmHg` : '—')}
                     </strong>
                   </div>
-                  <div className="bg-white p-2 rounded-lg border border-slate-200/80">
-                    <span className="text-[10px] text-slate-500 block uppercase">Pulse / HR</span>
-                    <strong className="text-slate-900 font-bold">
-                      {hoveredPoint.pulse !== null ? `${hoveredPoint.pulse} bpm` : 'Not recorded'}
+                  <div className="bg-white p-2 rounded-xl border border-slate-200/80 shadow-2xs">
+                    <span className="text-[10px] text-slate-400 font-semibold block uppercase">Pulse Rate</span>
+                    <strong className="text-slate-900 font-extrabold text-xs">
+                      {hoveredPoint.pulse !== null ? `${hoveredPoint.pulse} bpm` : '—'}
                     </strong>
                   </div>
-                  <div className="bg-white p-2 rounded-lg border border-slate-200/80">
-                    <span className="text-[10px] text-slate-500 block uppercase">Body Temp</span>
-                    <strong className="text-slate-900 font-bold">
-                      {hoveredPoint.temp !== null ? `${hoveredPoint.temp}°${hoveredPoint.tempUnit}` : 'Not recorded'}
+                  <div className="bg-white p-2 rounded-xl border border-slate-200/80 shadow-2xs">
+                    <span className="text-[10px] text-slate-400 font-semibold block uppercase">Temperature</span>
+                    <strong className="text-slate-900 font-extrabold text-xs">
+                      {hoveredPoint.temp !== null ? `${hoveredPoint.temp}°${hoveredPoint.tempUnit}` : '—'}
                     </strong>
                   </div>
-                  <div className="bg-white p-2 rounded-lg border border-slate-200/80">
-                    <span className="text-[10px] text-slate-500 block uppercase">SpO2 Level</span>
-                    <strong className="text-slate-900 font-bold">
-                      {hoveredPoint.spo2 !== null ? `${hoveredPoint.spo2}%` : 'Not recorded'}
+                  <div className="bg-white p-2 rounded-xl border border-slate-200/80 shadow-2xs">
+                    <span className="text-[10px] text-slate-400 font-semibold block uppercase">SpO2 Level</span>
+                    <strong className="text-slate-900 font-extrabold text-xs">
+                      {hoveredPoint.spo2 !== null ? `${hoveredPoint.spo2}%` : '—'}
+                    </strong>
+                  </div>
+                  <div className="bg-white p-2 rounded-xl border border-slate-200/80 shadow-2xs">
+                    <span className="text-[10px] text-slate-400 font-semibold block uppercase">Resp Rate</span>
+                    <strong className="text-slate-900 font-extrabold text-xs">
+                      {hoveredPoint.rr !== null ? `${hoveredPoint.rr}/min` : '—'}
+                    </strong>
+                  </div>
+                  <div className="bg-white p-2 rounded-xl border border-slate-200/80 shadow-2xs">
+                    <span className="text-[10px] text-slate-400 font-semibold block uppercase">Glucose</span>
+                    <strong className="text-slate-900 font-extrabold text-xs">
+                      {hoveredPoint.glucose !== null ? `${hoveredPoint.glucose} mg/dL` : '—'}
                     </strong>
                   </div>
                 </div>
               </div>
             ) : (
               <div className="p-2.5 bg-slate-50/70 rounded-xl border border-dashed border-slate-200 text-center text-[11px] text-slate-400">
-                Hover over any timestamped point on the trajectory above to inspect recorded values and clinician provenance.
+                Hover over any timestamped observation point on the trajectory above to inspect recorded values and clinician provenance.
               </div>
             )}
           </div>

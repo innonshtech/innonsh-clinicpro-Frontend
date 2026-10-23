@@ -24,7 +24,10 @@ import {
   Filter,
   Check,
   Stethoscope,
-  UserCheck
+  UserCheck,
+  Radio,
+  FileCheck2,
+  ExternalLink
 } from 'lucide-react';
 
 const formatDate = (dateStr) => {
@@ -46,28 +49,35 @@ const formatDate = (dateStr) => {
 
 const getCreatorInfo = (order) => {
   if (!order) return { name: 'Unknown', role: 'N/A' };
+  if (order.doctor_name || order.doctorName) {
+    const name = order.doctor_name || order.doctorName;
+    return {
+      name: name.startsWith('Dr.') ? name : `Dr. ${name}`,
+      role: 'Doctor'
+    };
+  }
   const type = (order.ordering_type || '').toLowerCase();
   if (type === 'receptionist' || order.receptionist) {
-    const recName = order.receptionist
+    const recName = typeof order.receptionist === 'object' && order.receptionist
       ? `${order.receptionist.first_name || ''} ${order.receptionist.last_name || ''}`.trim()
-      : 'Receptionist';
+      : (typeof order.receptionist === 'string' ? order.receptionist : 'Receptionist');
     return {
       name: recName || 'Receptionist',
       role: 'Receptionist'
     };
   }
   if (type === 'doctor' || order.doctor) {
-    const docFirstLast = order.doctor
+    const docFirstLast = typeof order.doctor === 'object' && order.doctor
       ? `${order.doctor.first_name || ''} ${order.doctor.last_name || ''}`.trim()
-      : 'Doctor';
-    const name = docFirstLast ? `Dr. ${docFirstLast}` : 'Dr. Doctor';
+      : (typeof order.doctor === 'string' ? order.doctor : '');
+    const name = docFirstLast ? (docFirstLast.startsWith('Dr.') ? docFirstLast : `Dr. ${docFirstLast}`) : (order.doctor_name || order.doctorName || 'Dr. Doctor');
     return {
       name,
       role: 'Doctor'
     };
   }
   return {
-    name: 'Clinic Staff',
+    name: order.created_by_user?.name || order.clinic?.clinic_name || 'Clinic Staff',
     role: 'Staff'
   };
 };
@@ -110,6 +120,36 @@ export const getPriorityBadge = (priority) => {
   }
 };
 
+
+const OPD_RADIOLOGY_PRESETS = {
+  'X-Ray': [
+    { name: 'Chest X-Ray PA View', price: 600 },
+    { name: 'Chest AP (Bedside Portable)', price: 750 },
+    { name: 'Abdomen Erect & Supine', price: 800 },
+    { name: 'Left Knee AP/Lateral', price: 600 },
+    { name: 'Right Knee AP/Lateral', price: 600 },
+    { name: 'Lumbar Spine AP/Lateral', price: 700 }
+  ],
+  'CT Scan': [
+    { name: 'HRCT Chest Non-Contrast', price: 3500 },
+    { name: 'NCCT Head / Brain', price: 2800 },
+    { name: 'CECT Whole Abdomen', price: 5000 },
+    { name: 'CT Cervical Spine', price: 3200 }
+  ],
+  'Ultrasound': [
+    { name: 'USG Whole Abdomen & Pelvis', price: 1500 },
+    { name: 'USG KUB (Kidney, Ureter, Bladder)', price: 1200 },
+    { name: 'USG Thyroid / Neck', price: 1400 },
+    { name: 'Venous Doppler Lower Limb', price: 2500 }
+  ],
+  'MRI': [
+    { name: 'MRI Brain Non-Contrast', price: 6000 },
+    { name: 'MRI Lumbar Spine', price: 6500 },
+    { name: 'MRI Cervical Spine', price: 6500 },
+    { name: 'MRI Knee Joint', price: 5500 }
+  ]
+};
+
 export default function LabOrdersManagement({ userRole = 'doctor', roleTitle = 'Doctor' }) {
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
@@ -141,8 +181,13 @@ export default function LabOrdersManagement({ userRole = 'doctor', roleTitle = '
   const [selectedItems, setSelectedItems] = useState([]); // [{ item_type: 'test'|'package', test_id/package_id, item_name, item_code, price }]
   const [priority, setPriority] = useState('routine');
   const [clinicalNotes, setClinicalNotes] = useState('');
-  const [serviceTab, setServiceTab] = useState('tests'); // 'tests' | 'packages'
+  const [serviceTab, setServiceTab] = useState('tests'); // 'tests' | 'packages' | 'radiology'
   const [serviceSearch, setServiceSearch] = useState('');
+  const [radModality, setRadModality] = useState('X-Ray');
+  const [radStudyName, setRadStudyName] = useState('');
+  const [radIndication, setRadIndication] = useState('');
+  const [radInstructions, setRadInstructions] = useState('');
+  const [radPrice, setRadPrice] = useState('600');
   const [submittingOrder, setSubmittingOrder] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -405,9 +450,42 @@ export default function LabOrdersManagement({ userRole = 'doctor', roleTitle = '
       setFormError('Please select a destination laboratory.');
       return;
     }
-    if (selectedItems.length === 0) {
-      setFormError('Please select at least one diagnostic test or package.');
+
+    let currentSelectedItems = [...selectedItems];
+    if (currentSelectedItems.length === 0 && serviceTab === 'radiology' && radStudyName.trim()) {
+      const ind = radIndication.trim() || clinicalNotes.trim();
+      if (!ind || ind.length < 3) {
+        setFormError('Clinical indication is mandatory for radiology (minimum 3 characters).');
+        return;
+      }
+      const priceNum = Number(radPrice) || 0;
+      const code = `RAD-${radModality.replace(/\s+/g, '').toUpperCase().slice(0, 3)}-${Date.now().toString().slice(-4)}`;
+      currentSelectedItems.push({
+        item_type: 'radiology',
+        test_id: `rad-${Date.now()}`,
+        package_id: null,
+        item_name: `${radModality}: ${radStudyName.trim()}`,
+        item_code: code,
+        modality: radModality,
+        study_name: radStudyName.trim(),
+        clinical_indication: ind,
+        instructions: radInstructions.trim(),
+        price: priceNum
+      });
+      setSelectedItems(currentSelectedItems);
+    }
+
+    if (currentSelectedItems.length === 0) {
+      setFormError('Please select at least one diagnostic test, package, or radiology study.');
       return;
+    }
+
+    // Validate radiology items clinical indication
+    for (const item of currentSelectedItems) {
+      if (item.item_type === 'radiology' && (!item.clinical_indication || item.clinical_indication.trim().length < 3)) {
+        setFormError('A clinical indication (minimum 3 characters) is required for each radiology investigation.');
+        return;
+      }
     }
 
     setSubmittingOrder(true);
@@ -418,10 +496,17 @@ export default function LabOrdersManagement({ userRole = 'doctor', roleTitle = '
       lab_id: selectedLabId,
       priority,
       clinical_notes: clinicalNotes.trim() || null,
-      items: selectedItems.map((i) => ({
+      items: currentSelectedItems.map((i) => ({
         item_type: i.item_type,
         test_id: i.test_id || undefined,
-        package_id: i.package_id || undefined
+        package_id: i.package_id || undefined,
+        item_name: i.item_name || undefined,
+        item_code: i.item_code || undefined,
+        modality: i.modality || undefined,
+        study_name: i.study_name || undefined,
+        clinical_indication: i.clinical_indication || undefined,
+        instructions: i.instructions || undefined,
+        price: i.price !== undefined ? Number(i.price) : undefined
       }))
     };
 
@@ -469,9 +554,10 @@ export default function LabOrdersManagement({ userRole = 'doctor', roleTitle = '
     });
 
     return [...list].sort((a, b) => {
-      const rankDiff = getPriorityRank(b.priority) - getPriorityRank(a.priority);
-      if (rankDiff !== 0) return rankDiff;
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      const timeA = new Date(a.created_at || a.createdAt || 0).getTime();
+      const timeB = new Date(b.created_at || b.createdAt || 0).getTime();
+      if (timeB !== timeA) return timeB - timeA;
+      return String(b.id || b._id || '').localeCompare(String(a.id || a._id || ''));
     });
   }, [orders, statusFilter, searchTerm]);
 
@@ -487,6 +573,20 @@ export default function LabOrdersManagement({ userRole = 'doctor', roleTitle = '
   const getStatusBadge = (status) => {
     const s = (status || 'pending').toLowerCase();
     switch (s) {
+      case 'completed':
+        return (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            Completed
+          </span>
+        );
+      case 'in_progress':
+        return (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-spin"></span>
+            In Progress
+          </span>
+        );
       case 'accepted':
         return (
           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 gap-1.5">
@@ -678,31 +778,48 @@ export default function LabOrdersManagement({ userRole = 'doctor', roleTitle = '
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-600">
-              <thead className="bg-slate-50 text-slate-700 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
+            <table className="w-full text-left text-sm text-slate-700">
+              <thead className="bg-slate-100/90 text-slate-900 text-xs font-bold uppercase tracking-wider border-b border-slate-300">
                 <tr>
-                  <th className="py-3.5 px-4 sm:px-6">Order ID</th>
-                  <th className="py-3.5 px-4">Priority</th>
-                  <th className="py-3.5 px-4">Patient</th>
-                  {userRole === 'clinic' && <th className="py-3.5 px-4">Created By</th>}
-                  <th className="py-3.5 px-4">Destination Lab</th>
-                  <th className="py-3.5 px-4">Order Date</th>
-                  <th className="py-3.5 px-4">Items Summary</th>
-                  <th className="py-3.5 px-4">Status</th>
-                  <th className="py-3.5 px-4 text-right">Actions</th>
+                  <th className="py-3.5 px-4 sm:px-6 text-slate-900 font-bold">Order ID</th>
+                  <th className="py-3.5 px-4 text-slate-900 font-bold">Priority</th>
+                  <th className="py-3.5 px-4 text-slate-900 font-bold">Patient</th>
+                  {userRole === 'clinic' && <th className="py-3.5 px-4 text-slate-900 font-bold">Created By</th>}
+                  <th className="py-3.5 px-4 text-slate-900 font-bold">Destination Lab</th>
+                  <th className="py-3.5 px-4 text-slate-900 font-bold">Order Date</th>
+                  <th className="py-3.5 px-4 text-slate-900 font-bold">Items Summary</th>
+                  <th className="py-3.5 px-4 text-slate-900 font-bold">Status</th>
+                  {userRole !== 'doctor' && userRole !== 'clinic' && userRole !== 'receptionist' && (
+                    <th className="py-3.5 px-4 text-right text-slate-900 font-bold">Actions</th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredOrders.map((order) => {
                   const itemCount = Array.isArray(order.items) ? order.items.length : 0;
                   const creator = getCreatorInfo(order);
+                  const orderKey = order.id || order._id || order.order_number;
 
                   return (
-                    <tr key={order.id} className="hover:bg-slate-50/70 transition-colors">
+                    <tr
+                      key={orderKey}
+                      onClick={() => setViewingOrder(order)}
+                      className="hover:bg-slate-50/70 transition-colors cursor-pointer"
+                    >
                       <td className="py-4 px-4 sm:px-6 font-medium">
-                        <span className="font-mono text-xs font-bold text-teal-700 bg-teal-50 px-2.5 py-1 rounded-md border border-teal-200/70">
-                          {order.order_number}
-                        </span>
+                        <button
+                          type="button"
+                          id={`btn-order-${orderKey}`}
+                          data-testid={`btn-order-${order.order_number || order.orderNumber || order.id}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewingOrder(order);
+                          }}
+                          className="font-mono text-xs font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 hover:text-teal-900 px-2.5 py-1 rounded-md border border-teal-200/70 inline-block transition-colors cursor-pointer text-left focus:outline-none focus:ring-1 focus:ring-teal-500"
+                          title="Click to view order details"
+                        >
+                          {order.order_number || order.orderNumber || (order.id ? 'RAD-' + String(order.id).slice(0, 8) : 'View Order')}
+                        </button>
                       </td>
 
                       <td className="py-4 px-4 whitespace-nowrap">
@@ -710,16 +827,24 @@ export default function LabOrdersManagement({ userRole = 'doctor', roleTitle = '
                       </td>
 
                       <td className="py-4 px-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
-                            <User className="w-3.5 h-3.5" />
-                          </div>
+                        {userRole === 'clinic' ? (
                           <div>
                             <span className="font-semibold text-slate-900 block text-xs">
                               {order.patient?.first_name} {order.patient?.last_name}
                             </span>
                           </div>
-                        </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
+                              <User className="w-3.5 h-3.5" />
+                            </div>
+                            <div>
+                              <span className="font-semibold text-slate-900 block text-xs">
+                                {order.patient?.first_name} {order.patient?.last_name}
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </td>
 
                       {/* Created By & Role (Specifically for Clinic history) */}
@@ -752,10 +877,7 @@ export default function LabOrdersManagement({ userRole = 'doctor', roleTitle = '
                       )}
 
                       <td className="py-4 px-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-md bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">
-                            <FlaskConical className="w-3 h-3" />
-                          </div>
+                        {userRole === 'clinic' ? (
                           <div className="text-xs">
                             <span className="font-medium text-slate-900 block">
                               {order.lab?.lab_name || 'Laboratory'}
@@ -764,7 +886,21 @@ export default function LabOrdersManagement({ userRole = 'doctor', roleTitle = '
                               {order.lab?.city || 'Facility'}
                             </span>
                           </div>
-                        </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-md bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">
+                              <FlaskConical className="w-3 h-3" />
+                            </div>
+                            <div className="text-xs">
+                              <span className="font-medium text-slate-900 block">
+                                {order.lab?.lab_name || 'Laboratory'}
+                              </span>
+                              <span className="text-[10px] text-slate-400">
+                                {order.lab?.city || 'Facility'}
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </td>
 
                       <td className="py-4 px-4 text-xs text-slate-500 whitespace-nowrap">
@@ -797,16 +933,21 @@ export default function LabOrdersManagement({ userRole = 'doctor', roleTitle = '
 
                       <td className="py-4 px-4">{getStatusBadge(order.status)}</td>
 
-                      <td className="py-4 px-4 text-right">
-                        <button
-                          id={`btn-view-${order.id}`}
-                          onClick={() => setViewingOrder(order)}
-                          className="p-1.5 text-slate-500 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
-                          title="View Order Details"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      </td>
+                      {userRole !== 'doctor' && userRole !== 'clinic' && userRole !== 'receptionist' && (
+                        <td className="py-4 px-4 text-right">
+                          <button
+                            id={`btn-view-${orderKey}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setViewingOrder(order);
+                            }}
+                            className="p-1.5 text-slate-500 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors cursor-pointer"
+                            title="View Order Details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -1024,6 +1165,7 @@ export default function LabOrdersManagement({ userRole = 'doctor', roleTitle = '
                     <div className="flex bg-slate-100 p-0.5 rounded-lg text-xs">
                       <button
                         type="button"
+                        id="tab-btn-catalog-tests"
                         onClick={() => setServiceTab('tests')}
                         className={`px-3 py-1 rounded-md font-semibold transition-colors ${
                           serviceTab === 'tests' ? 'bg-white text-teal-800 shadow-xs' : 'text-slate-600'
@@ -1033,12 +1175,24 @@ export default function LabOrdersManagement({ userRole = 'doctor', roleTitle = '
                       </button>
                       <button
                         type="button"
+                        id="tab-btn-catalog-packages"
                         onClick={() => setServiceTab('packages')}
                         className={`px-3 py-1 rounded-md font-semibold transition-colors ${
                           serviceTab === 'packages' ? 'bg-white text-teal-800 shadow-xs' : 'text-slate-600'
                         }`}
                       >
                         Packages ({labCatalog.packages?.length || 0})
+                      </button>
+                      <button
+                        type="button"
+                        id="tab-btn-catalog-radiology"
+                        onClick={() => setServiceTab('radiology')}
+                        className={`px-3 py-1 rounded-md font-semibold transition-colors flex items-center gap-1.5 ${
+                          serviceTab === 'radiology' ? 'bg-white text-teal-800 shadow-xs' : 'text-slate-600'
+                        }`}
+                      >
+                        <Radio className="w-3.5 h-3.5" />
+                        <span>Radiology / Imaging</span>
                       </button>
                     </div>
                   )}
@@ -1052,7 +1206,170 @@ export default function LabOrdersManagement({ userRole = 'doctor', roleTitle = '
                   </div>
                 ) : (
                   <>
-                    {/* Search Services */}
+                    {/* Radiology / Imaging Ordering Section */}
+                    {serviceTab === 'radiology' ? (
+                      <div className="p-4 bg-sky-50/50 rounded-xl border border-sky-200/80 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-bold text-sky-950 flex items-center gap-2">
+                            <Radio className="w-4 h-4 text-sky-600" />
+                            Order Radiology Investigation
+                          </h4>
+                          <span className="text-[11px] text-sky-700 bg-white px-2 py-0.5 rounded border border-sky-200">
+                            Destination: {labs.find(l => (l.id === selectedLabId || l._id === selectedLabId))?.lab_name || 'Selected Facility'}
+                          </span>
+                        </div>
+
+                        {/* Modality selector buttons */}
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 mb-1.5">Imaging Modality</label>
+                          <div className="grid grid-cols-4 gap-2">
+                            {['X-Ray', 'CT Scan', 'Ultrasound', 'MRI'].map((mod) => (
+                              <button
+                                key={mod}
+                                type="button"
+                                onClick={() => {
+                                  setRadModality(mod);
+                                  const firstPreset = OPD_RADIOLOGY_PRESETS[mod]?.[0];
+                                  if (firstPreset) {
+                                    setRadStudyName(firstPreset.name);
+                                    setRadPrice(String(firstPreset.price));
+                                  }
+                                }}
+                                className={`py-1.5 px-2 rounded-lg text-xs font-semibold text-center border transition-all cursor-pointer ${
+                                  radModality === mod
+                                    ? 'bg-sky-600 text-white border-sky-600 shadow-xs'
+                                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                                }`}
+                              >
+                                {mod}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Presets */}
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-600 mb-1">Common Protocols</label>
+                          <div className="flex flex-wrap gap-1.5">
+                            {(OPD_RADIOLOGY_PRESETS[radModality] || []).map((preset) => (
+                              <button
+                                key={preset.name}
+                                type="button"
+                                onClick={() => {
+                                  setRadStudyName(preset.name);
+                                  setRadPrice(String(preset.price));
+                                }}
+                                className="px-2 py-1 bg-white hover:bg-sky-100 hover:text-sky-800 border border-slate-200 rounded text-[11px] text-slate-700 transition-colors"
+                              >
+                                {preset.name} (₹{preset.price})
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Inputs: Study Name, Indication, Instructions, Price */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="sm:col-span-2">
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                              Investigation / Study Name <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              id="input-opd-study-name"
+                              placeholder="e.g. Chest X-Ray PA View"
+                              value={radStudyName}
+                              onChange={(e) => setRadStudyName(e.target.value)}
+                              className="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500"
+                            />
+                          </div>
+
+                          <div className="sm:col-span-2">
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                              Clinical Indication <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              id="input-opd-clinical-indication"
+                              placeholder="e.g. Chronic cough and fever; evaluate for infiltrate"
+                              value={radIndication}
+                              onChange={(e) => setRadIndication(e.target.value)}
+                              className="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                              Specific Instructions (Optional)
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Patient requires lead apron; fasting 4 hrs"
+                              value={radInstructions}
+                              onChange={(e) => setRadInstructions(e.target.value)}
+                              className="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                              Estimated Tariff / Price (₹)
+                            </label>
+                            <input
+                              type="number"
+                              placeholder="600"
+                              value={radPrice}
+                              onChange={(e) => setRadPrice(e.target.value)}
+                              className="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end pt-1">
+                          <button
+                            type="button"
+                            id="btn-add-opd-radiology-item"
+                            onClick={() => {
+                              if (!radStudyName.trim()) {
+                                toast.error('Study name is required.');
+                                return;
+                              }
+                              const ind = radIndication.trim() || clinicalNotes.trim();
+                              if (!ind || ind.length < 3) {
+                                toast.error('Clinical indication is mandatory (min 3 characters).');
+                                return;
+                              }
+                              const priceNum = Number(radPrice) || 0;
+                              const code = `RAD-${radModality.replace(/\s+/g, '').toUpperCase().slice(0, 3)}-${Date.now().toString().slice(-4)}`;
+                              setSelectedItems((prev) => [
+                                ...prev,
+                                {
+                                  item_type: 'radiology',
+                                  test_id: `rad-${Date.now()}`,
+                                  package_id: null,
+                                  item_name: `${radModality}: ${radStudyName.trim()}`,
+                                  item_code: code,
+                                  modality: radModality,
+                                  study_name: radStudyName.trim(),
+                                  clinical_indication: ind,
+                                  instructions: radInstructions.trim(),
+                                  price: priceNum
+                                }
+                              ]);
+                              toast.success(`Added ${radModality}: ${radStudyName.trim()} to order items`);
+                              setRadStudyName('');
+                              setRadIndication('');
+                              setRadInstructions('');
+                            }}
+                            className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Add Radiology Investigation</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Search Services */}
                     <div className="relative">
                       <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
@@ -1111,6 +1428,9 @@ export default function LabOrdersManagement({ userRole = 'doctor', roleTitle = '
                         ))
                       )}
                     </div>
+
+                      </>
+                    )}
 
                     {/* Selected Items List */}
                     <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 space-y-2">
@@ -1254,8 +1574,14 @@ export default function LabOrdersManagement({ userRole = 'doctor', roleTitle = '
       {/* ========================================================= */}
       {viewingOrder && (
         <ModalPortal isOpen={Boolean(viewingOrder)} onClose={() => setViewingOrder(null)}>
-        <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6">
-          <div className="bg-white rounded-2xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[88vh] my-auto">
+        <div 
+          onClick={() => setViewingOrder(null)}
+          className="fixed inset-0 z-[100] overflow-y-auto bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[88vh] my-auto"
+          >
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/50">
               <div className="flex items-center space-x-2.5">
                 <div className="w-8 h-8 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center">
@@ -1264,7 +1590,7 @@ export default function LabOrdersManagement({ userRole = 'doctor', roleTitle = '
                 <div>
                   <h2 className="text-base font-bold text-slate-900">Order Details</h2>
                   <span className="text-xs font-mono text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200/60">
-                    {viewingOrder?.order_number}
+                    {viewingOrder?.order_number || viewingOrder?.orderNumber || (viewingOrder?.id ? 'RAD-' + String(viewingOrder.id).slice(0, 8) : 'Order Details')}
                   </span>
                 </div>
               </div>
@@ -1301,15 +1627,17 @@ export default function LabOrdersManagement({ userRole = 'doctor', roleTitle = '
                       Patient
                     </span>
                     <p className="font-bold text-slate-900 text-sm">
-                      {viewingOrder.patient?.first_name} {viewingOrder.patient?.last_name}
+                      {(viewingOrder.patient && (viewingOrder.patient.first_name || viewingOrder.patient.last_name))
+                        ? `${viewingOrder.patient.first_name || ''} ${viewingOrder.patient.last_name || ''}`.trim()
+                        : (viewingOrder.patient_name || viewingOrder.patientName || (typeof viewingOrder.patient === 'string' ? viewingOrder.patient : 'Patient'))}
                     </p>
-                    {(viewingOrder.patient?.patient_code || viewingOrder.patient?.id) && (
+                    {(viewingOrder.patient?.patient_code || viewingOrder.patient?.id || viewingOrder.patient_code || viewingOrder.patientCode || viewingOrder.admission_number || viewingOrder.admission_id) && (
                       <p className="text-slate-600 mt-1">
-                        Patient ID: <span className="font-mono">{viewingOrder.patient?.patient_code || viewingOrder.patient?.id}</span>
+                        {viewingOrder.admission_number || viewingOrder.admission_id ? 'Admission #:' : 'Patient ID:'} <span className="font-mono">{viewingOrder.patient?.patient_code || viewingOrder.patient?.id || viewingOrder.patient_code || viewingOrder.patientCode || viewingOrder.admission_number || viewingOrder.admission_id}</span>
                       </p>
                     )}
                     <p className="text-slate-600 mt-0.5">
-                      Phone: {viewingOrder.patient?.phone_number || 'N/A'}
+                      Phone: {viewingOrder.patient?.phone_number || viewingOrder.patient_phone || viewingOrder.phone || 'N/A'}
                     </p>
                   </div>
 
@@ -1318,10 +1646,10 @@ export default function LabOrdersManagement({ userRole = 'doctor', roleTitle = '
                     Destination Lab
                   </span>
                   <p className="font-bold text-slate-900 text-sm">
-                    {viewingOrder.lab?.lab_name || 'Laboratory'}
+                    {viewingOrder.lab?.lab_name || viewingOrder.destination_lab_name || viewingOrder.lab_name || 'Laboratory'}
                   </p>
                   <p className="text-slate-600 mt-1">
-                    Location: {viewingOrder.lab?.city || 'N/A'}
+                    Location: {viewingOrder.lab?.city || viewingOrder.destination_lab_city || viewingOrder.city || 'N/A'}
                   </p>
                 </div>
               </div>
@@ -1350,6 +1678,65 @@ export default function LabOrdersManagement({ userRole = 'doctor', roleTitle = '
                 );
               })()}
 
+              {/* Finalized Diagnostic Report Display */}
+              {viewingOrder.report && (
+                <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-emerald-200/60">
+                    <div className="flex items-center gap-2">
+                      <FileCheck2 className="w-5 h-5 text-emerald-700" />
+                      <div>
+                        <span className="font-bold text-emerald-950 text-xs block">Finalized Diagnostic Radiology Report</span>
+                        <span className="text-[11px] text-emerald-800">
+                          Signed by {viewingOrder.report.uploadedBy?.name || 'Diagnostic Specialist'} on {formatDate(viewingOrder.report.uploadedAt)}
+                        </span>
+                      </div>
+                    </div>
+                    {viewingOrder.report.isCritical && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                        Critical Alert Flagged
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Clinical Findings:</span>
+                    <p className="text-xs text-slate-900 mt-0.5 leading-relaxed bg-white p-2.5 rounded-lg border border-emerald-100">
+                      {viewingOrder.report.findings}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Specialist Impression:</span>
+                    <p className="text-xs font-semibold text-emerald-950 mt-0.5 leading-relaxed bg-white p-2.5 rounded-lg border border-emerald-100">
+                      {viewingOrder.report.impression}
+                    </p>
+                  </div>
+
+                  {viewingOrder.report.recommendations && (
+                    <div>
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Recommendations:</span>
+                      <p className="text-xs text-slate-700 mt-0.5 bg-white p-2 rounded-lg border border-emerald-100">
+                        {viewingOrder.report.recommendations}
+                      </p>
+                    </div>
+                  )}
+
+                  {viewingOrder.report.file?.fileUrl && (
+                    <div className="pt-2 flex justify-end">
+                      <a
+                        href={viewingOrder.report.file.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>View / Download Final Scan PDF</span>
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {viewingOrder.clinical_notes && (
                 <div className="p-3.5 bg-amber-50/60 rounded-xl border border-amber-200/60 text-xs">
                   <span className="font-semibold text-amber-900 block mb-1">Clinical Notes:</span>
@@ -1364,30 +1751,136 @@ export default function LabOrdersManagement({ userRole = 'doctor', roleTitle = '
                 </div>
               )}
 
-              <div>
-                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2.5">
-                  Ordered Services ({viewingOrder.items?.length || 0})
-                </h4>
-                <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100">
-                  {(viewingOrder.items || []).map((it, idx) => (
-                    <div key={idx} className="p-3 flex items-center justify-between text-xs bg-white">
+              {(() => {
+                const radItems = (viewingOrder.items || []).filter(i => i.item_type === 'radiology');
+                const standardItems = (viewingOrder.items || []).filter(i => i.item_type !== 'radiology');
+                const isRadOrder = radItems.length > 0 || Boolean(viewingOrder.study_name || viewingOrder.modality || viewingOrder.investigation_type);
+
+                return (
+                  <div className="space-y-4">
+                    {/* Radiology Investigations Card */}
+                    {isRadOrder && (
+                      <div className="p-4 bg-sky-50/70 border border-sky-200/80 rounded-xl space-y-3">
+                        <div className="flex items-center justify-between pb-2 border-b border-sky-200/60">
+                          <div className="flex items-center gap-2">
+                            <Radio className="w-4 h-4 text-sky-700" />
+                            <span className="font-bold text-sky-950 text-xs">
+                              Radiology & Imaging Investigation
+                            </span>
+                          </div>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-300">
+                            {radItems[0]?.modality || viewingOrder.modality || viewingOrder.investigation_type || 'Radiology'}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                          <div>
+                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                              Study / Protocol:
+                            </span>
+                            <span className="font-semibold text-slate-900 block mt-0.5">
+                              {radItems[0]?.study_name || viewingOrder.study_name || radItems[0]?.item_name || 'Radiology Study'}
+                            </span>
+                          </div>
+
+                          <div>
+                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                              Clinical Indication:
+                            </span>
+                            <span className="text-slate-800 block mt-0.5">
+                              {radItems[0]?.clinical_indication || viewingOrder.clinical_indication || viewingOrder.clinical_notes || 'Diagnostic Investigation'}
+                            </span>
+                          </div>
+
+                          {(radItems[0]?.instructions || viewingOrder.instructions) && (
+                            <div className="sm:col-span-2">
+                              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                                Instructions / Notes:
+                              </span>
+                              <span className="text-slate-700 italic block mt-0.5">
+                                {radItems[0]?.instructions || viewingOrder.instructions}
+                              </span>
+                            </div>
+                          )}
+
+                          <div>
+                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                              Patient Context:
+                            </span>
+                            <span className="text-slate-800 block mt-0.5">
+                              {viewingOrder.admission_id || viewingOrder.admission_number || viewingOrder.originType === 'IPD' ? (
+                                <span className="font-semibold text-indigo-700">
+                                  Inpatient (Admission: {viewingOrder.admission_number || viewingOrder.admission_id?.slice(0, 8)})
+                                </span>
+                              ) : (
+                                <span className="text-slate-700">
+                                  Outpatient (Code: {viewingOrder.patient?.patient_code || viewingOrder.patient_code || 'OPD'})
+                                </span>
+                              )}
+                            </span>
+                          </div>
+
+                          <div>
+                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                              Destination Lab:
+                            </span>
+                            <span className="text-slate-800 font-medium block mt-0.5">
+                              {viewingOrder.lab?.lab_name || viewingOrder.destination_lab_name || viewingOrder.lab_name || 'Assigned Laboratory'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {radItems.length > 1 && (
+                          <div className="pt-2 border-t border-sky-200/60 space-y-1.5">
+                            <span className="text-[11px] font-bold text-slate-600 block">
+                              Additional Ordered Imaging Studies ({radItems.length - 1}):
+                            </span>
+                            {radItems.slice(1).map((r, rIdx) => (
+                              <div key={rIdx} className="p-2 bg-white rounded-lg border border-sky-100 flex items-center justify-between text-xs">
+                                <div>
+                                  <span className="font-semibold text-slate-900">{r.modality}: {r.study_name || r.item_name}</span>
+                                  {r.clinical_indication && (
+                                    <p className="text-[11px] text-slate-500">Indication: {r.clinical_indication}</p>
+                                  )}
+                                </div>
+                                <span className="font-bold text-slate-800">₹{Number(r.price || 0).toLocaleString('en-IN')}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Pathology Tests & Packages (if any) */}
+                    {standardItems.length > 0 && (
                       <div>
-                        <span className="font-semibold text-slate-900 block">{it.item_name}</span>
-                        <span className="text-[10px] text-slate-400 font-mono">
-                          {it.item_code} • {it.item_type}
-                        </span>
+                        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2.5">
+                          Ordered Pathology Tests & Packages ({standardItems.length})
+                        </h4>
+                        <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100">
+                          {standardItems.map((it, idx) => (
+                            <div key={idx} className="p-3 flex items-center justify-between text-xs bg-white">
+                              <div>
+                                <span className="font-semibold text-slate-900 block">{it.item_name}</span>
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                  {it.item_code} • {it.item_type}
+                                </span>
+                              </div>
+                              <div className="font-bold text-slate-800">
+                                ₹{Number(it.price || 0).toLocaleString('en-IN')}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <div className="font-bold text-slate-800">
-                        ₹{Number(it.price || 0).toLocaleString('en-IN')}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               <div className="pt-3 border-t border-slate-100 text-xs text-slate-400 flex items-center justify-between">
-                <span>Created: {formatDate(viewingOrder.created_at)}</span>
-                <span>Updated: {formatDate(viewingOrder.updated_at)}</span>
+                <span>Created: {formatDate(viewingOrder.created_at || viewingOrder.createdAt)}</span>
+                <span>Updated: {formatDate(viewingOrder.updated_at || viewingOrder.updatedAt || viewingOrder.created_at || viewingOrder.createdAt)}</span>
               </div>
             </div>
             )}

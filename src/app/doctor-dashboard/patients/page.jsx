@@ -1099,267 +1099,336 @@ const PatientManagementPage = () => {
     }
   };
 
+  const exportToCSV = () => {
+    if (filteredPatients.length === 0) {
+      toast.error('No patient records to export');
+      return;
+    }
+    const headers = ['Patient Code', 'Name', 'Gender', 'Age', 'Phone', 'Email', 'Blood Type', 'Condition', 'Address', 'Status'];
+    const rows = filteredPatients.map((p) => [
+      `"${p.patientCode || ''}"`,
+      `"${p.name || ''}"`,
+      `"${p.gender || ''}"`,
+      `"${p.age || ''}"`,
+      `"${p.phone || ''}"`,
+      `"${p.email || ''}"`,
+      `"${p.bloodType || ''}"`,
+      `"${(p.condition || '').replace(/"/g, '""')}"`,
+      `"${(p.address || '').replace(/"/g, '""')}"`,
+      `"${p.status || 'Active'}"`
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `clinic_patients_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success(`Exported ${filteredPatients.length} patient records`);
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+      {/* ─────────────────────────────────────────────────────────────
+          1. HEADER SECTION (Matching Lab Orders style)
+      ───────────────────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Patient Management</h1>
-          <p className="text-sm text-slate-500 mt-1">Manage and review all clinic patient records, medical profiles, and visit histories</p>
+          <div className="flex items-center space-x-2 text-blue-600 mb-1">
+            <User className="w-5 h-5" />
+            <span className="text-xs font-semibold uppercase tracking-wider">Clinical Patient Directory</span>
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Patient Management</h1>
+          <p className="text-slate-500 text-sm mt-0.5">
+            Manage and review all clinic patient records, medical profiles, and visit histories.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3 self-start sm:self-auto">
+          <div className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-left">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              {hasActiveFilters || searchTerm ? 'Filtered' : 'Total Patients'}
+            </span>
+            <span className="text-lg font-bold text-slate-900">
+              {filteredPatients.length} <span className="text-xs font-normal text-slate-500">records</span>
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={exportToCSV}
+            className="inline-flex items-center justify-center px-4 py-2.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 rounded-xl text-sm font-semibold transition-colors shadow-sm gap-2 cursor-pointer shrink-0"
+            title="Export filtered records to CSV"
+          >
+            <Download className="w-4 h-4 text-slate-500" />
+            <span>Export CSV</span>
+          </button>
         </div>
       </div>
 
-      {/* Summary Stat Card */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs p-5 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              {hasActiveFilters || searchTerm ? 'Filtered Patients' : 'Total Patients'}
-            </p>
-            <p className="text-3xl font-bold text-slate-900 tracking-tight mt-1.5">{filteredPatients.length}</p>
-            <p className="text-xs text-slate-400 mt-1">
-              {hasActiveFilters ? 'Matching active filter criteria' : 'Active and registered clinic records'}
-            </p>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-            <User className="w-6 h-6" />
-          </div>
-        </div>
-      </div>
-
-      {/* Filter and Action Toolbar */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs p-4">
-        <div className="flex flex-col xl:flex-row gap-4 items-stretch xl:items-center justify-between">
-          {/* Search & Filters */}
-          <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 flex-1">
-            {/* Search Input */}
-            <div className="relative flex-1 min-w-[240px]">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Search patients by name, email, code, or condition..."
-                className="w-full pl-10 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              {searchTerm && (
-                <button
-                  type="button"
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
-                  title="Clear search"
-                  aria-label="Clear search"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-
-            {/* Filter Dropdown Popover (Replaces Date Controls) */}
-            <div className="relative" ref={filterDropdownRef}>
+      {/* ─────────────────────────────────────────────────────────────
+          2. SEARCH & FILTER TOOLBAR (Matching Lab Orders style)
+      ───────────────────────────────────────────────────────────── */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          {/* Search Input */}
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search patients by name, email, code, or condition..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-colors"
+            />
+            {searchTerm && (
               <button
                 type="button"
-                onClick={() => setShowFilterDropdown(prev => !prev)}
-                className={`inline-flex items-center gap-2 px-3.5 py-2 border rounded-lg text-sm font-semibold transition-all cursor-pointer ${
-                  hasActiveFilters
-                    ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-xs'
-                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-xs'
-                }`}
-                aria-expanded={showFilterDropdown}
-                aria-haspopup="true"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                title="Clear search"
+                aria-label="Clear search"
               >
-                <Filter className={`w-4 h-4 ${hasActiveFilters ? 'text-blue-600' : 'text-slate-500'}`} />
-                <span>Filter</span>
-                {hasActiveFilters && (
-                  <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">
-                    {activeFilterCount}
-                  </span>
-                )}
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-0.5" />
-              </button>
-
-              {/* Dropdown Menu */}
-              {showFilterDropdown && (
-                <div className="absolute left-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-200/80 p-4 z-40 space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                    <div className="flex items-center gap-2">
-                      <Filter className="w-4 h-4 text-blue-600" />
-                      <h4 className="text-sm font-bold text-slate-900">Filter Patients</h4>
-                    </div>
-                    {hasActiveFilters && (
-                      <button
-                        type="button"
-                        onClick={resetAllFilters}
-                        className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
-                      >
-                        Reset all
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Gender Filter */}
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-                      Gender
-                    </label>
-                    <select
-                      value={selectedGender}
-                      onChange={(e) => setSelectedGender(e.target.value)}
-                      className="w-full h-9 px-3 text-xs text-slate-800 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    >
-                      <option value="All">All Genders</option>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
-                      <option value="Not Specified">Not Specified</option>
-                    </select>
-                  </div>
-
-                  {/* Blood Type Filter */}
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-                      Blood Type
-                    </label>
-                    <select
-                      value={selectedBloodType}
-                      onChange={(e) => setSelectedBloodType(e.target.value)}
-                      className="w-full h-9 px-3 text-xs text-slate-800 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    >
-                      <option value="All">All Blood Types</option>
-                      <option value="A+">A+</option>
-                      <option value="A-">A-</option>
-                      <option value="B+">B+</option>
-                      <option value="B-">B-</option>
-                      <option value="AB+">AB+</option>
-                      <option value="AB-">AB-</option>
-                      <option value="O+">O+</option>
-                      <option value="O-">O-</option>
-                    </select>
-                  </div>
-
-                  {/* Status Filter */}
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-                      Patient Status
-                    </label>
-                    <select
-                      value={selectedStatus}
-                      onChange={(e) => setSelectedStatus(e.target.value)}
-                      className="w-full h-9 px-3 text-xs text-slate-800 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    >
-                      <option value="All">All Statuses</option>
-                      <option value="Active">Active</option>
-                      <option value="Inactive">Inactive</option>
-                    </select>
-                  </div>
-
-                  {/* Age Range Filter */}
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-                      Age Range
-                    </label>
-                    <select
-                      value={selectedAgeRange}
-                      onChange={(e) => setSelectedAgeRange(e.target.value)}
-                      className="w-full h-9 px-3 text-xs text-slate-800 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    >
-                      <option value="All">All Ages</option>
-                      <option value="0-17">Pediatric (0 - 17 yrs)</option>
-                      <option value="18-35">Young Adult (18 - 35 yrs)</option>
-                      <option value="36-50">Adult (36 - 50 yrs)</option>
-                      <option value="51+">Senior (51+ yrs)</option>
-                    </select>
-                  </div>
-
-                  {/* Footer */}
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                    <span className="text-xs text-slate-500">
-                      {filteredPatients.length} match{filteredPatients.length === 1 ? '' : 'es'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setShowFilterDropdown(false)}
-                      className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors cursor-pointer"
-                    >
-                      Done
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Quick Reset Button if filters active */}
-            {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={resetAllFilters}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200/60 transition-colors cursor-pointer"
-                title="Reset all active filters"
-              >
-                <X className="w-3.5 h-3.5" />
-                Reset Filters
+                <X className="w-4 h-4" />
               </button>
             )}
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2.5 self-end xl:self-center">
+          {/* Filter Popover Container */}
+          <div className="relative flex items-center gap-2" ref={filterDropdownRef}>
             <button
               type="button"
-              className="inline-flex items-center gap-2 px-3.5 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-xs"
+              onClick={() => setShowFilterDropdown((prev) => !prev)}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 border rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+                hasActiveFilters
+                  ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-xs'
+                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-xs'
+              }`}
+              aria-expanded={showFilterDropdown}
+              aria-haspopup="true"
             >
-              <Download className="w-4 h-4 text-slate-500" />
-              Export
+              <Filter className={`w-4 h-4 ${hasActiveFilters ? 'text-blue-600' : 'text-slate-500'}`} />
+              <span>Filters</span>
+              {hasActiveFilters && (
+                <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-0.5" />
             </button>
+
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={resetAllFilters}
+                className="inline-flex items-center gap-1 px-2.5 py-2 text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl border border-rose-200/60 transition-colors cursor-pointer"
+                title="Reset all active filters"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Reset</span>
+              </button>
+            )}
+
+            {/* Filter Popover Menu */}
+            {showFilterDropdown && (
+              <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-200 p-4 z-40 space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Filter className="w-4 h-4 text-blue-600" />
+                    <h4 className="text-sm font-bold text-slate-900">Filter Patients</h4>
+                  </div>
+                  {hasActiveFilters && (
+                    <button
+                      type="button"
+                      onClick={resetAllFilters}
+                      className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
+                    >
+                      Reset all
+                    </button>
+                  )}
+                </div>
+
+                {/* Gender Filter */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                    Gender
+                  </label>
+                  <select
+                    value={selectedGender}
+                    onChange={(e) => setSelectedGender(e.target.value)}
+                    className="w-full h-9 px-3 text-xs text-slate-800 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  >
+                    <option value="All">All Genders</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                    <option value="Not Specified">Not Specified</option>
+                  </select>
+                </div>
+
+                {/* Blood Type Filter */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                    Blood Type
+                  </label>
+                  <select
+                    value={selectedBloodType}
+                    onChange={(e) => setSelectedBloodType(e.target.value)}
+                    className="w-full h-9 px-3 text-xs text-slate-800 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  >
+                    <option value="All">All Blood Types</option>
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                  </select>
+                </div>
+
+                {/* Age Range Filter */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                    Age Range
+                  </label>
+                  <select
+                    value={selectedAgeRange}
+                    onChange={(e) => setSelectedAgeRange(e.target.value)}
+                    className="w-full h-9 px-3 text-xs text-slate-800 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  >
+                    <option value="All">All Ages</option>
+                    <option value="0-17">Pediatric (0 - 17 yrs)</option>
+                    <option value="18-35">Young Adult (18 - 35 yrs)</option>
+                    <option value="36-50">Adult (36 - 50 yrs)</option>
+                    <option value="51+">Senior (51+ yrs)</option>
+                  </select>
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-xs text-slate-500">
+                    {filteredPatients.length} match{filteredPatients.length === 1 ? '' : 'es'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowFilterDropdown(false)}
+                    className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors cursor-pointer"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Quick Status Tabs (Matching Lab Orders status tabs style) */}
+        <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            <button
+              type="button"
+              onClick={() => setSelectedStatus('All')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer ${
+                selectedStatus === 'All'
+                  ? 'bg-blue-50 text-blue-700 border border-blue-200/60'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <span>All Patients</span>
+              <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-slate-100 text-slate-600">
+                {patients.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedStatus('Active')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer ${
+                selectedStatus === 'Active'
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              <span>Active</span>
+              <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-emerald-100 text-emerald-800">
+                {patients.filter((p) => (p.status || 'Active').toLowerCase() === 'active').length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedStatus('Inactive')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer ${
+                selectedStatus === 'Inactive'
+                  ? 'bg-rose-50 text-rose-700 border border-rose-200/60'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+              <span>Inactive</span>
+              <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-rose-100 text-rose-800">
+                {patients.filter((p) => (p.status || '').toLowerCase() === 'inactive').length}
+              </span>
+            </button>
+          </div>
+
+          <div className="text-xs text-slate-500 hidden sm:block">
+            Showing <span className="font-semibold text-slate-800">{filteredPatients.length}</span> of {patients.length} records
           </div>
         </div>
       </div>
 
-      {/* Patient Table Container */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
+      {/* ─────────────────────────────────────────────────────────────
+          3. PATIENTS TABLE CONTAINER (Matching Lab Orders table style)
+      ───────────────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50/75">
+          <table className="w-full text-left text-sm text-slate-700">
+            <thead className="bg-slate-100/90 text-slate-900 text-xs font-bold uppercase tracking-wider border-b border-slate-300">
               <tr>
-                <th scope="col" className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                <th scope="col" className="py-3.5 px-4 sm:px-6 text-slate-900 font-bold">
                   Patient Code
                 </th>
-                <th scope="col" className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                <th scope="col" className="py-3.5 px-4 text-slate-900 font-bold">
                   Patient Name
                 </th>
-                <th scope="col" className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                <th scope="col" className="py-3.5 px-4 text-slate-900 font-bold">
                   Contact
                 </th>
-                <th scope="col" className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                  Condition & Blood
+                <th scope="col" className="py-3.5 px-4 text-slate-900 font-bold">
+                  Condition &amp; Blood
                 </th>
-                <th scope="col" className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                <th scope="col" className="py-3.5 px-4 text-slate-900 font-bold">
                   Address
                 </th>
-                <th scope="col" className="px-5 py-3.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                <th scope="col" className="py-3.5 px-4 sm:px-6 text-right text-slate-900 font-bold">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100">
               {filteredPatients.length > 0 ? (
                 filteredPatients.map((patient) => (
                   <tr
                     key={patient._id || patient.id}
-                    className="hover:bg-slate-50/80 transition-colors duration-150 group"
+                    onClick={() => router.push(`/doctor-dashboard/patients/${patient._id || patient.id}`)}
+                    className="hover:bg-slate-50/70 transition-colors cursor-pointer group"
                   >
-                    {/* Patient Code */}
-                    <td className="px-5 py-4 whitespace-nowrap">
-                      <span className="inline-flex items-center font-mono text-xs font-semibold text-blue-700 bg-blue-50/80 px-2.5 py-1 rounded-md border border-blue-100/80">
+                    {/* Patient Code styled like Order ID in Lab Orders */}
+                    <td className="py-4 px-4 sm:px-6 font-medium">
+                      <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 hover:text-blue-900 px-2.5 py-1 rounded-md border border-blue-200/70 inline-block transition-colors cursor-pointer text-left">
                         {patient.patientCode || patient.patient_code || 'N/A'}
                       </span>
                     </td>
 
                     {/* Patient Name & Details */}
-                    <td className="px-5 py-4 whitespace-nowrap">
+                    <td className="py-4 px-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-blue-50 border border-blue-100/80 text-blue-600 flex items-center justify-center font-semibold text-xs shrink-0">
-                          {patient.firstName ? patient.firstName[0].toUpperCase() : (patient.name ? patient.name[0].toUpperCase() : <User className="w-4 h-4" />)}
+                        <div className="w-8 h-8 rounded-full bg-blue-50 border border-blue-100/80 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0">
+                          {patient.firstName ? patient.firstName[0].toUpperCase() : (patient.name ? patient.name[0].toUpperCase() : <User className="w-3.5 h-3.5" />)}
                         </div>
                         <div>
                           <div className="text-sm font-semibold text-slate-900 capitalize group-hover:text-blue-600 transition-colors">
@@ -1379,7 +1448,7 @@ const PatientManagementPage = () => {
                     </td>
 
                     {/* Contact */}
-                    <td className="px-5 py-4 whitespace-nowrap">
+                    <td className="py-4 px-4 whitespace-nowrap">
                       <div className="space-y-1">
                         <div className="text-xs text-slate-700 font-medium flex items-center gap-1.5">
                           <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -1393,14 +1462,14 @@ const PatientManagementPage = () => {
                     </td>
 
                     {/* Condition & Blood Type */}
-                    <td className="px-5 py-4 whitespace-nowrap">
+                    <td className="py-4 px-4 whitespace-nowrap">
                       <div>
-                        <div className="text-xs font-medium text-slate-800 line-clamp-1">
+                        <div className="text-xs font-medium text-slate-800 line-clamp-1 max-w-[180px]">
                           {patient.condition || 'No condition specified'}
                         </div>
                         <div className="mt-1 flex items-center gap-1.5">
                           {patient.bloodType && patient.bloodType !== 'Unknown' ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-100">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
                               Blood: {patient.bloodType}
                             </span>
                           ) : (
@@ -1411,54 +1480,51 @@ const PatientManagementPage = () => {
                     </td>
 
                     {/* Address Column */}
-                    <td className="px-5 py-4 text-xs text-slate-700 max-w-[220px]">
+                    <td className="py-4 px-4 text-xs text-slate-700 max-w-[200px]">
                       <div className="flex items-start gap-1.5">
                         <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                        <span className="truncate" title={patient.address}>
+                        <span className="truncate block" title={patient.address}>
                           {patient.address || 'Not provided'}
                         </span>
                       </div>
                     </td>
 
-                    {/* Explicit Actions: View, Edit, Delete */}
-                    <td className="px-5 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    {/* Actions: View, Edit, Delete */}
+                    <td className="py-4 px-4 sm:px-6 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end gap-1">
-                        {/* 1. Explicit View Action */}
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             router.push(`/doctor-dashboard/patients/${patient._id || patient.id}`);
                           }}
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
                           title="View Patient Details"
                           aria-label={`View details for ${patient.name}`}
                         >
                           <Eye className="w-4 h-4" />
                         </button>
 
-                        {/* 2. Explicit Edit Action */}
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             openModal('edit', patient);
                           }}
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer"
                           title="Edit Patient"
                           aria-label={`Edit ${patient.name}`}
                         >
                           <Edit className="w-4 h-4" />
                         </button>
 
-                        {/* 3. Explicit Delete Action */}
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             deletePatient(patient._id || patient.id);
                           }}
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                           title="Delete Patient"
                           aria-label={`Delete ${patient.name}`}
                         >
@@ -1469,32 +1535,31 @@ const PatientManagementPage = () => {
                   </tr>
                 ))
               ) : (
-                /* Clean Clinical Empty State */
+                /* Clean Empty State (Matching Lab Orders style) */
                 <tr>
-                  <td colSpan={6} className="py-12 px-6 text-center">
-                    <div className="max-w-sm mx-auto flex flex-col items-center">
-                      <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-center text-slate-400 mb-3">
-                        <User className="w-6 h-6" />
-                      </div>
-                      <h3 className="text-sm font-semibold text-slate-800">No patients found</h3>
-                      <p className="text-xs text-slate-500 mt-1 mb-4">
-                        {searchTerm || hasActiveFilters
-                          ? 'No patient records matched your active search query or filter criteria.'
-                          : 'There are no patient records currently registered in your clinic.'}
-                      </p>
-                      {(searchTerm || hasActiveFilters) && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSearchTerm('');
-                            resetAllFilters();
-                          }}
-                          className="px-3.5 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors cursor-pointer"
-                        >
-                          Clear all filters & search
-                        </button>
-                      )}
+                  <td colSpan={6} className="py-16 text-center px-4">
+                    <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                      <User className="w-7 h-7" />
                     </div>
+                    <h3 className="text-base font-semibold text-slate-800">No patients found</h3>
+                    <p className="text-sm text-slate-500 mt-1 max-w-md mx-auto">
+                      {searchTerm || hasActiveFilters
+                        ? 'No patient records match your active search query or filter criteria. Try resetting filters.'
+                        : 'There are no patient records currently registered in your clinic.'}
+                    </p>
+                    {(searchTerm || hasActiveFilters) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchTerm('');
+                          resetAllFilters();
+                        }}
+                        className="mt-4 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-semibold transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                        <span>Clear All Filters &amp; Search</span>
+                      </button>
+                    )}
                   </td>
                 </tr>
               )}

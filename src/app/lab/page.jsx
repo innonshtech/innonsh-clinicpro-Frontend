@@ -158,7 +158,72 @@ function LabAdminDashboard({ labUser }) {
         res = await axios.get('/api/v1/lab/orders', { headers });
       }
       const fetched = res.data?.data?.orders || res.data?.orders || [];
-      setOrders(Array.isArray(fetched) ? fetched : []);
+
+      // Also query routed IPD radiology orders so Dashboard counts and Recent Orders include both OPD and IPD workflows
+      let ipdOrders = [];
+      try {
+        let ipdRes;
+        try {
+          ipdRes = await axios.get(`${API_BASE_URL}/api/v1/ipd/radiology/orders`, { headers });
+        } catch (_) {
+          ipdRes = await axios.get('/api/v1/ipd/radiology/orders', { headers });
+        }
+        const ipdList = ipdRes.data?.data?.orders || ipdRes.data?.orders || [];
+        ipdOrders = ipdList.map((o) => {
+          const patientName = o.patient_name || o.patientName || (o.patient ? `${o.patient.first_name || ''} ${o.patient.last_name || ''}`.trim() : '') || 'Inpatient';
+          const admissionNum = o.admission_number || o.admissionNumber || (o.admission_id ? o.admission_id.slice(0, 8) : '');
+          const orderAmount = (o.price !== undefined && o.price !== null)
+            ? Number(o.price)
+            : (o.total_amount !== undefined && o.total_amount !== null)
+            ? Number(o.total_amount)
+            : (o.amount !== undefined && o.amount !== null)
+            ? Number(o.amount)
+            : null;
+          return {
+            ...o,
+            originType: 'IPD',
+            order_number: o.order_number || o.orderNumber || (o.id ? `RAD-${o.id.slice(0, 6)}` : 'RAD-IPD'),
+            admission_number: admissionNum,
+            total_amount: orderAmount,
+            price: orderAmount,
+            amount: orderAmount,
+            patient: {
+              first_name: patientName,
+              last_name: '',
+              patient_code: o.patient_code || o.patientCode,
+              admission_number: admissionNum
+            },
+            doctor: { first_name: o.doctor_name || o.doctorName || (o.doctor ? `Dr. ${o.doctor.first_name || ''} ${o.doctor.last_name || ''}`.trim() : '') || 'Attending Physician', last_name: '' },
+            clinic: { clinic_name: o.clinic_name || o.clinicName || (o.clinic?.clinic_name) || 'Inpatient Clinic' },
+            priority: o.priority || 'routine',
+            status: ['ORDERED', 'PENDING'].includes((o.status || '').toUpperCase()) ? 'pending' : (o.status || '').toLowerCase(),
+            items: [{ item_name: `${o.investigation_type || 'Radiology'}: ${o.study_name || 'Imaging'}` }]
+          };
+        });
+      } catch (errIpd) {
+        console.error('Failed to load IPD radiology orders for dashboard:', errIpd?.response?.data || errIpd?.message || errIpd);
+      }
+
+      // Deduplicate by unique key to prevent duplicate counts or rows
+      const seenIds = new Set();
+      const deduped = [];
+      for (const item of [...fetched, ...ipdOrders]) {
+        const key = item.id || item._id || item.order_number;
+        if (key && !seenIds.has(key)) {
+          seenIds.add(key);
+          deduped.push(item);
+        } else if (!key) {
+          deduped.push(item);
+        }
+      }
+
+      const combined = deduped.sort((a, b) => {
+        const timeA = new Date(a.created_at || a.createdAt || 0).getTime();
+        const timeB = new Date(b.created_at || b.createdAt || 0).getTime();
+        if (timeB !== timeA) return timeB - timeA;
+        return String(b.id || b._id || '').localeCompare(String(a.id || a._id || ''));
+      });
+      setOrders(combined);
     } catch (err) {
       console.error('Error fetching dashboard lab orders:', err);
     } finally {
@@ -314,8 +379,17 @@ function LabAdminDashboard({ labUser }) {
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200/60 text-[11px]">
-                          {order.order_number}
+                          {order.order_number || order.orderNumber || (order.id ? (order.originType === 'IPD' ? 'RAD-' : 'ORD-') + String(order.id).slice(0, 8) : 'ORD-LAB')}
                         </span>
+                        {order.originType === 'IPD' ? (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            IPD • Adm: {order.admission_number || order.admission_id?.slice(0, 8) || 'Inpatient'}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            OPD
+                          </span>
+                        )}
                         {getPriorityBadge(order.priority)}
                         <span className="font-semibold text-slate-900">
                           {order.patient?.first_name} {order.patient?.last_name}
@@ -357,7 +431,7 @@ function LabAdminDashboard({ labUser }) {
                         </span>
 
                         <span className="text-slate-400">
-                          {formatDate(order.created_at)}
+                          {formatDateTime(order.created_at || order.createdAt)}
                         </span>
                       </div>
                     </div>
@@ -365,8 +439,12 @@ function LabAdminDashboard({ labUser }) {
 
                   <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pl-11 sm:pl-0">
                     <div className="text-right">
-                      <span className="font-bold text-slate-900 block">
-                        ₹{Number(order.total_amount || 0).toLocaleString('en-IN')}
+                      <span className="font-bold text-slate-900 block font-mono">
+                        {(order.total_amount !== null && order.total_amount !== undefined) || (order.price !== null && order.price !== undefined) ? (
+                          `₹${Number(order.total_amount ?? order.price).toLocaleString('en-IN')}`
+                        ) : (
+                          <span className="text-xs text-slate-400 italic font-sans font-normal">Unset</span>
+                        )}
                       </span>
                       <span className="text-[10px] text-slate-400">
                         {itemCount} {itemCount === 1 ? 'item' : 'items'}

@@ -330,25 +330,6 @@ export default function LoginPage() {
                 </Form>
               )}
             </Formik>
-
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-              className="mt-3.5 text-center"
-            >
-              <p className="text-[13px] font-medium text-gray-500 dark:text-gray-500">
-                Don't have an account?{' '}
-                <button
-                  type="button"
-                  onClick={() => router.push('/register')}
-                  className="font-semibold text-[#185CFC] dark:text-[#185CFC] hover:opacity-80 transition-colors ml-1"
-                >
-                  Register your clinic
-                </button>
-              </p>
-            </motion.div>
-
             {/* Trust Badges */}
             <motion.div
               initial={{ opacity: 0 }}
