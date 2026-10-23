@@ -37,7 +37,13 @@ import {
   Droplets,
   ArrowDownRight,
   ArrowUpRight,
-  Scale
+  Scale,
+  ArrowRightLeft,
+  AlertTriangle,
+  Eye,
+  Download,
+  FileCheck2,
+  ShieldCheck
 } from 'lucide-react';
 import { API_BASE_URL, getAuthHeaders } from '@/utils/api';
 import CreateLabOrderModal from '@/components/CreateLabOrderModal';
@@ -47,6 +53,44 @@ import { getPriorityBadge } from '@/components/LabOrdersManagement';
 import ModalPortal from '@/components/ModalPortal';
 
 // --- Utility Helpers ---
+
+export const IPD_RADIOLOGY_PRESETS = {
+  'X-Ray': [
+    { name: 'Chest PA View', price: 600 },
+    { name: 'Chest AP (Portable Bedside)', price: 750 },
+    { name: 'Abdomen Erect & Supine', price: 800 },
+    { name: 'Left Knee AP/Lateral', price: 600 },
+    { name: 'Right Knee AP/Lateral', price: 600 },
+    { name: 'Lumbar Spine AP/Lateral', price: 700 }
+  ],
+  'CT Scan': [
+    { name: 'HRCT Chest Non-Contrast', price: 3500 },
+    { name: 'NCCT Head / Brain', price: 2800 },
+    { name: 'CECT Whole Abdomen', price: 5000 },
+    { name: 'CT Angiography Pulmonary', price: 6500 },
+    { name: 'CT Cervical Spine', price: 3200 }
+  ],
+  'Ultrasound': [
+    { name: 'USG Whole Abdomen & Pelvis', price: 1500 },
+    { name: 'USG KUB (Kidney, Ureter, Bladder)', price: 1200 },
+    { name: 'FAST Bedside Protocol', price: 1800 },
+    { name: 'USG Venous Doppler Lower Limb', price: 2500 },
+    { name: 'USG Neck / Thyroid', price: 1400 }
+  ],
+  'MRI': [
+    { name: 'MRI Brain with DWI', price: 6000 },
+    { name: 'MRI Lumbar Spine', price: 6500 },
+    { name: 'MRI Cervical Spine', price: 6500 },
+    { name: 'MRI Knee Joint', price: 5500 }
+  ]
+};
+
+export function getRadiologyPresetPrice(modality, studyName) {
+  if (!studyName) return null;
+  const list = IPD_RADIOLOGY_PRESETS[modality] || [];
+  const found = list.find(p => p.name.trim().toLowerCase() === studyName.trim().toLowerCase());
+  return found ? found.price : null;
+}
 
 export function formatDoctorName(name) {
   if (!name) return 'Dr. Doctor';
@@ -259,12 +303,40 @@ export default function InpatientProfilePage() {
   const [ioSummary, setIoSummary] = useState(null);
   const [loadingIo, setLoadingIo] = useState(false);
 
+  // Nursing Care Notes (Read-Only Doctor View)
+  const [nursingNotes, setNursingNotes] = useState([]);
+  const [loadingNursingNotes, setLoadingNursingNotes] = useState(false);
 
   // Lab Orders
   const [labOrders, setLabOrders] = useState([]);
   const [loadingLabOrders, setLoadingLabOrders] = useState(false);
   const [isCreateLabModalOpen, setIsCreateLabModalOpen] = useState(false);
   const [viewingLabOrder, setViewingLabOrder] = useState(null);
+
+  // Radiology Orders
+  const [radiologyOrders, setRadiologyOrders] = useState([]);
+  const [loadingRadiologyOrders, setLoadingRadiologyOrders] = useState(false);
+  const [isCreateRadiologyModalOpen, setIsCreateRadiologyModalOpen] = useState(false);
+  const [viewingRadiologyOrder, setViewingRadiologyOrder] = useState(null);
+  const [cancellingRadiologyOrder, setCancellingRadiologyOrder] = useState(null);
+  const [radiologyCancelReason, setRadiologyCancelReason] = useState('');
+  const [radiologyFilter, setRadiologyFilter] = useState('ALL');
+  const [isRadiologySubmitting, setIsRadiologySubmitting] = useState(false);
+  const [radiologyFormError, setRadiologyFormError] = useState('');
+  const [activeLabs, setActiveLabs] = useState([]);
+  const [loadingActiveLabs, setLoadingActiveLabs] = useState(false);
+
+  const [radiologyForm, setRadiologyForm] = useState({
+    lab_id: '',
+    lab_name: '',
+    investigation_type: 'X-Ray',
+    study_name: '',
+    price: null,
+    clinical_indication: '',
+    priority: 'routine',
+    transport_mode: 'ambulatory',
+    instructions: ''
+  });
 
   // Discharge State
   const [dischargeForm, setDischargeForm] = useState({
@@ -277,6 +349,163 @@ export default function InpatientProfilePage() {
 
   // Doctor Map for audit actor resolution
   const [docMap, setDocMap] = useState({});
+
+  // Patient Transfer State
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [transferWards, setTransferWards] = useState([]);
+  const [transferBeds, setTransferBeds] = useState([]);
+  const [transferBedsLoading, setTransferBedsLoading] = useState(false);
+  const [transferForm, setTransferForm] = useState({
+    destinationWardId: '',
+    destinationBedId: '',
+    reason: '',
+    clinicalNotes: ''
+  });
+  const [transferSubmitting, setTransferSubmitting] = useState(false);
+  const [transferError, setTransferError] = useState('');
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancellingTransfer, setCancellingTransfer] = useState(false);
+
+// Inpatient Medications & MAR State (Doctor View)
+  const [medicationsData, setMedicationsData] = useState({ prescriptions: [], marRecords: [], scheduledDoses: [] });
+  const [loadingMeds, setLoadingMeds] = useState(false);
+  const [prescribeModalOpen, setPrescribeModalOpen] = useState(false);
+  const [prescribeForm, setPrescribeForm] = useState({
+    medication_name: '',
+    dosage: '',
+    route: 'Oral',
+    frequency: 'OD',
+    schedule: '',
+    instructions: '',
+    duration: '5 days'
+  });
+  const [prescribeSubmitting, setPrescribeSubmitting] = useState(false);
+  const [prescribeError, setPrescribeError] = useState('');
+  const [prescribeSuccess, setPrescribeSuccess] = useState('');
+
+  const [discontinueModal, setDiscontinueModal] = useState({
+    isOpen: false,
+    prescription: null,
+    reasonPreset: 'Therapy Completed / Condition Improved',
+    reasonText: '',
+    isSubmitting: false,
+    error: ''
+  });
+
+  const fetchMedications = useCallback(async () => {
+    if (!admissionId) return;
+    setLoadingMeds(true);
+    try {
+      const storedClinicId = localStorage.getItem('clinicId') || clinicId;
+      const url = `${API_BASE_URL}/api/v1/ipd/admissions/${admissionId}/mar${storedClinicId ? `?clinicId=${storedClinicId}` : ''}`;
+      const res = await fetch(url, { headers: getAuthHeaders() });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setMedicationsData({
+          prescriptions: data.data?.prescriptions || [],
+          marRecords: data.data?.marRecords || [],
+          scheduledDoses: data.data?.scheduledDoses || []
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching inpatient medications:', err);
+    } finally {
+      setLoadingMeds(false);
+    }
+  }, [admissionId, clinicId]);
+
+  const handleCreatePrescription = async (e) => {
+    e.preventDefault();
+    if (prescribeSubmitting || !admissionId) return;
+
+    setPrescribeSubmitting(true);
+    setPrescribeError('');
+    setPrescribeSuccess('');
+
+    try {
+      const storedClinicId = localStorage.getItem('clinicId') || clinicId;
+      const res = await fetch(`${API_BASE_URL}/api/v1/ipd/admissions/${admissionId}/prescriptions`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          ...prescribeForm,
+          clinicId: storedClinicId
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setPrescribeSuccess('Inpatient prescription authorized successfully.');
+        setTimeout(() => setPrescribeSuccess(''), 4000);
+        setPrescribeModalOpen(false);
+        setPrescribeForm({
+          medication_name: '',
+          dosage: '',
+          route: 'Oral',
+          frequency: 'OD',
+          schedule: '',
+          instructions: '',
+          duration: '5 days'
+        });
+        fetchMedications();
+      } else {
+        setPrescribeError(data.message || 'Failed to authorize inpatient prescription');
+      }
+    } catch (err) {
+      console.error('Error authorizing prescription:', err);
+      setPrescribeError('Network error while issuing prescription.');
+    } finally {
+      setPrescribeSubmitting(false);
+    }
+  };
+
+  const handleDiscontinuePrescription = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!discontinueModal.prescription || discontinueModal.isSubmitting || !admissionId) return;
+
+    const finalReason = (discontinueModal.reasonText || discontinueModal.reasonPreset || '').trim();
+    if (finalReason.length < 3) {
+      setDiscontinueModal(prev => ({ ...prev, error: 'A mandatory clinical reason is required (minimum 3 characters).' }));
+      return;
+    }
+
+    setDiscontinueModal(prev => ({ ...prev, isSubmitting: true, error: '' }));
+
+    try {
+      const storedClinicId = localStorage.getItem('clinicId') || clinicId;
+      const res = await fetch(`${API_BASE_URL}/api/v1/ipd/admissions/${admissionId}/prescriptions/${discontinueModal.prescription.id}/discontinue`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          reason: finalReason,
+          clinicId: storedClinicId
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setPrescribeSuccess(`Prescription for "${discontinueModal.prescription.medication_name || discontinueModal.prescription.medicationName}" discontinued successfully.`);
+        setTimeout(() => setPrescribeSuccess(''), 4000);
+        setDiscontinueModal({
+          isOpen: false,
+          prescription: null,
+          reasonPreset: 'Therapy Completed / Condition Improved',
+          reasonText: '',
+          isSubmitting: false,
+          error: ''
+        });
+        fetchMedications();
+      } else {
+        setDiscontinueModal(prev => ({ ...prev, error: data.message || 'Failed to discontinue prescription.' }));
+      }
+    } catch (err) {
+      console.error('Error discontinuing prescription:', err);
+      setDiscontinueModal(prev => ({ ...prev, error: 'Network error while discontinuing prescription.' }));
+    } finally {
+      setDiscontinueModal(prev => ({ ...prev, isSubmitting: false }));
+    }
+  };
 
   // Auto-dismiss notifications
   useEffect(() => {
@@ -348,6 +577,10 @@ export default function InpatientProfilePage() {
   useEffect(() => {
     fetchAdmission();
   }, [fetchAdmission]);
+
+  useEffect(() => {
+    if (activeTab === 'medications') fetchMedications();
+  }, [activeTab, fetchMedications]);
 
   // Load Clinical Notes for this admission
   const loadClinicalNotes = useCallback(async () => {
@@ -447,6 +680,39 @@ export default function InpatientProfilePage() {
     }
   }, [admissionId, loadIntakeOutput]);
 
+  // Fetch Nursing Care Notes for this admission (Read-Only)
+  const loadNursingNotes = useCallback(async () => {
+    if (!admissionId) return;
+    setLoadingNursingNotes(true);
+    try {
+      const storedClinicId = localStorage.getItem('clinicId') || clinicId;
+      const url = `${API_BASE_URL}/api/v1/ipd/admissions/${admissionId}/nursing-notes${storedClinicId ? `?clinicId=${storedClinicId}` : ''}`;
+      const res = await fetch(url, { headers: getAuthHeaders() });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const raw = data.data?.notes || [];
+        const sorted = [...raw].sort((a, b) => {
+          const tA = new Date(a.recorded_at || a.created_at || a.createdAt || 0).getTime();
+          const tB = new Date(b.recorded_at || b.created_at || b.createdAt || 0).getTime();
+          return tB - tA;
+        });
+        setNursingNotes(sorted);
+      } else {
+        setNursingNotes([]);
+      }
+    } catch (err) {
+      console.error('Error loading nursing notes in doctor profile:', err);
+      setNursingNotes([]);
+    } finally {
+      setLoadingNursingNotes(false);
+    }
+  }, [admissionId, clinicId]);
+
+  useEffect(() => {
+    if (admissionId) {
+      loadNursingNotes();
+    }
+  }, [admissionId, loadNursingNotes]);
 
   // Fetch Lab Orders for this patient
   const loadLabOrders = useCallback(async () => {
@@ -479,6 +745,149 @@ export default function InpatientProfilePage() {
       loadLabOrders();
     }
   }, [admission?.patient_id, loadLabOrders]);
+
+  // Fetch Active Destination Laboratories for Radiology Requisitions
+  const fetchActiveLabs = useCallback(async () => {
+    try {
+      setLoadingActiveLabs(true);
+      const res = await fetch(`${API_BASE_URL}/api/v1/lab/active`, {
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      const list = data.data?.labs || data.labs || [];
+      if (Array.isArray(list)) {
+        setActiveLabs(list);
+        if (list.length === 1) {
+          setRadiologyForm(prev => ({
+            ...prev,
+            lab_id: list[0].id || list[0]._id,
+            lab_name: list[0].lab_name || list[0].name
+          }));
+        }
+      }
+    } catch (e) {
+      console.warn('Error fetching active labs:', e);
+    } finally {
+      setLoadingActiveLabs(false);
+    }
+  }, []);
+
+  // Fetch Radiology Orders for this admission
+  const loadRadiologyOrders = useCallback(async () => {
+    if (!admissionId) return;
+    setLoadingRadiologyOrders(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/ipd/admissions/${admissionId}/radiology`, {
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setRadiologyOrders(data.data?.orders || []);
+      } else {
+        setRadiologyOrders([]);
+      }
+    } catch (err) {
+      console.error('Error fetching radiology orders:', err);
+      setRadiologyOrders([]);
+    } finally {
+      setLoadingRadiologyOrders(false);
+    }
+  }, [admissionId]);
+
+  useEffect(() => {
+    if (admissionId) {
+      loadRadiologyOrders();
+    }
+  }, [admissionId, loadRadiologyOrders]);
+
+  const handleCreateRadiologyOrder = async (e) => {
+    e.preventDefault();
+    if (isRadiologySubmitting) return;
+    setRadiologyFormError('');
+
+    if (!radiologyForm.lab_id) {
+      setRadiologyFormError('Please select a destination diagnostic laboratory.');
+      return;
+    }
+    if (!radiologyForm.study_name.trim()) {
+      setRadiologyFormError('Study name / examination description is required.');
+      return;
+    }
+    if (!radiologyForm.clinical_indication.trim() || radiologyForm.clinical_indication.trim().length < 3) {
+      setRadiologyFormError('Clinical indication is mandatory (minimum 3 characters).');
+      return;
+    }
+
+    setIsRadiologySubmitting(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/ipd/admissions/${admissionId}/radiology`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders()
+        },
+        body: JSON.stringify({
+          ...radiologyForm,
+          price: radiologyForm.price !== undefined && radiologyForm.price !== null ? Number(radiologyForm.price) : null,
+          tariff: radiologyForm.price !== undefined && radiologyForm.price !== null ? Number(radiologyForm.price) : null,
+          total_amount: radiologyForm.price !== undefined && radiologyForm.price !== null ? Number(radiologyForm.price) : null,
+          clinicId: clinicId || admission?.clinic_id || admission?.clinicId
+        })
+      });
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        throw new Error(result.message || result.error?.message || 'Failed to place radiology order.');
+      }
+
+      setIsCreateRadiologyModalOpen(false);
+      setRadiologyForm({
+        lab_id: '',
+        lab_name: '',
+        investigation_type: 'X-Ray',
+        study_name: '',
+        price: null,
+        clinical_indication: '',
+        priority: 'routine',
+        transport_mode: 'ambulatory',
+        instructions: ''
+      });
+      loadRadiologyOrders();
+    } catch (err) {
+      setRadiologyFormError(err.message);
+    } finally {
+      setIsRadiologySubmitting(false);
+    }
+  };
+
+  const handleCancelRadiologyOrder = async () => {
+    if (!cancellingRadiologyOrder) return;
+    setIsRadiologySubmitting(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/ipd/admissions/${admissionId}/radiology/${cancellingRadiologyOrder.id}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders()
+        },
+        body: JSON.stringify({
+          status: 'CANCELLED',
+          cancel_reason: radiologyCancelReason || 'Cancelled by attending physician',
+          clinicId: clinicId || admission?.clinic_id || admission?.clinicId
+        })
+      });
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        throw new Error(result.message || 'Failed to cancel order.');
+      }
+      setCancellingRadiologyOrder(null);
+      setRadiologyCancelReason('');
+      loadRadiologyOrders();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setIsRadiologySubmitting(false);
+    }
+  };
 
   // Handle Note Submission (Doctor Round / Clinical Note)
   const handleAddNote = async (e) => {
@@ -690,6 +1099,149 @@ export default function InpatientProfilePage() {
     }
   };
 
+  // Open Transfer Modal & fetch available wards
+  const openTransferModal = async () => {
+    setTransferError('');
+    setTransferForm({
+      destinationWardId: '',
+      destinationBedId: '',
+      reason: '',
+      clinicalNotes: ''
+    });
+    setTransferBeds([]);
+    setTransferModalOpen(true);
+    try {
+      const storedClinicId = localStorage.getItem('clinicId') || clinicId;
+      const res = await fetch(`${API_BASE_URL}/api/v1/ipd/wards?clinicId=${storedClinicId}`, {
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setTransferWards(data.data?.wards || []);
+      }
+    } catch (err) {
+      console.error('Failed to load wards for transfer:', err);
+      setTransferError('Unable to load clinic wards. Please try again.');
+    }
+  };
+
+  // When Doctor selects destination ward in transfer modal
+  const handleTransferWardChange = async (wardId) => {
+    setTransferForm(prev => ({ ...prev, destinationWardId: wardId, destinationBedId: '' }));
+    setTransferBeds([]);
+    if (!wardId) return;
+
+    setTransferBedsLoading(true);
+    setTransferError('');
+    try {
+      const storedClinicId = localStorage.getItem('clinicId') || clinicId;
+      const res = await fetch(`${API_BASE_URL}/api/v1/ipd/beds/available?clinicId=${storedClinicId}&wardId=${wardId}`, {
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setTransferBeds(data.data?.beds || []);
+      } else {
+        setTransferBeds([]);
+        setTransferError(data.message || 'No available beds found in the selected ward.');
+      }
+    } catch (err) {
+      console.error('Failed to load available beds for ward:', err);
+      setTransferError('Failed to fetch available beds.');
+    } finally {
+      setTransferBedsLoading(false);
+    }
+  };
+
+  // Doctor initiates and approves patient transfer
+  const handleInitiateTransfer = async (e) => {
+    e?.preventDefault();
+    if (!transferForm.destinationWardId) {
+      setTransferError('Please select a destination ward.');
+      return;
+    }
+    if (!transferForm.destinationBedId) {
+      setTransferError('Please select an eligible destination bed.');
+      return;
+    }
+
+    setTransferSubmitting(true);
+    setTransferError('');
+    try {
+      const storedClinicId = localStorage.getItem('clinicId') || clinicId;
+      const res = await fetch(`${API_BASE_URL}/api/v1/ipd/admissions/${admissionId}/transfers`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders()
+        },
+        body: JSON.stringify({
+          clinicId: storedClinicId,
+          destinationWardId: transferForm.destinationWardId,
+          destinationBedId: transferForm.destinationBedId,
+          reason: transferForm.reason.trim() || undefined,
+          clinicalNotes: transferForm.clinicalNotes.trim() || undefined
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to initiate transfer');
+      }
+
+      setTransferModalOpen(false);
+      setNotification({
+        type: 'success',
+        message: 'Patient transfer initiated and approved. Destination bed is RESERVED awaiting nurse execution.'
+      });
+      await fetchAdmission();
+    } catch (err) {
+      console.error('Transfer initiation error:', err);
+      setTransferError(err.message || 'Failed to initiate transfer');
+    } finally {
+      setTransferSubmitting(false);
+    }
+  };
+
+  // Doctor cancels a pending transfer
+  const handleCancelTransfer = async () => {
+    if (!admission?.pendingTransfer?.id) return;
+    setCancellingTransfer(true);
+    try {
+      const storedClinicId = localStorage.getItem('clinicId') || clinicId;
+      const res = await fetch(`${API_BASE_URL}/api/v1/ipd/admissions/${admissionId}/transfers/${admission.pendingTransfer.id}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders()
+        },
+        body: JSON.stringify({
+          clinicId: storedClinicId,
+          reason: cancelReason.trim() || 'Cancelled by Doctor'
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to cancel transfer');
+      }
+
+      setCancelModalOpen(false);
+      setCancelReason('');
+      setNotification({
+        type: 'success',
+        message: 'Patient transfer cancelled. Destination bed has been released back to AVAILABLE.'
+      });
+      await fetchAdmission();
+    } catch (err) {
+      console.error('Cancel transfer error:', err);
+      setNotification({
+        type: 'error',
+        message: err.message || 'Failed to cancel transfer'
+      });
+    } finally {
+      setCancellingTransfer(false);
+    }
+  };
+
   // Vitals extracted from progress notes and nurse observations chronologically
   const vitalsHistory = useMemo(() => {
     const list = [];
@@ -898,6 +1450,17 @@ export default function InpatientProfilePage() {
           </div>
 
           <div className="flex items-center gap-2">
+            {isAdmitted && !admission?.pendingTransfer && (
+              <button
+                onClick={openTransferModal}
+                id="doctor-initiate-transfer-btn"
+                className="px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+                title="Initiate inpatient bed/ward transfer"
+              >
+                <ArrowRightLeft className="w-3.5 h-3.5" />
+                <span>Initiate Transfer</span>
+              </button>
+            )}
             <span
               className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
                 isAdmitted
@@ -919,6 +1482,44 @@ export default function InpatientProfilePage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-6">
+        {/* PENDING TRANSFER ALERT BANNER */}
+        {admission?.pendingTransfer && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in duration-200">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 bg-amber-100 text-amber-800 rounded-xl shrink-0 mt-0.5">
+                <ArrowRightLeft className="w-5 h-5 text-amber-700" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-amber-900">Patient Transfer Approved (Awaiting Nurse Execution)</h3>
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-200 text-amber-900 uppercase tracking-wide">
+                    {admission.pendingTransfer.status || 'APPROVED'}
+                  </span>
+                </div>
+                <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                  Doctor approved transfer to <strong className="font-semibold">{admission.pendingTransfer.destinationWardName || 'Destination Ward'}</strong> • Bed <strong className="font-semibold">{admission.pendingTransfer.destinationBedNumber || 'Bed'}</strong>.
+                  Destination bed is <span className="font-semibold text-amber-900">RESERVED</span>. The assigned nurse will record physical movement and complete the transfer.
+                </p>
+                {admission.pendingTransfer.reason && (
+                  <p className="text-xs text-amber-700 mt-1 italic">
+                    Reason: "{admission.pendingTransfer.reason}"
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+              <button
+                onClick={() => setCancelModalOpen(true)}
+                id="doctor-cancel-transfer-btn"
+                className="px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Cancel Transfer</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ==================== 1. PROFILE HEADER / BANNER ==================== */}
         <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-6 relative overflow-hidden">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
@@ -1003,8 +1604,8 @@ export default function InpatientProfilePage() {
         </div>
 
         {/* ==================== 2. PROFILE TABS NAVIGATION ==================== */}
-        <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs p-1.5">
-          <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar scroll-smooth" aria-label="Profile Sections">
+        <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs p-1.5 max-w-full overflow-hidden">
+          <nav className="flex items-center gap-1.5 overflow-x-auto scroll-smooth py-1 px-0.5" aria-label="Profile Sections">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -1155,7 +1756,7 @@ export default function InpatientProfilePage() {
             </div>
 
             {/* Patient Admission History Table (Requirement 4) */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden max-w-full">
               <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
@@ -1166,65 +1767,65 @@ export default function InpatientProfilePage() {
                     Previous and concurrent IPD admissions recorded for {patientName}.
                   </p>
                 </div>
-                <span className="text-xs font-medium px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md">
+                <span className="text-xs font-semibold px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md">
                   Total Admissions: {patientHistory.length || 1}
                 </span>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-slate-600">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
+              <div className="overflow-x-auto max-w-full">
+                <table className="w-full min-w-[760px] text-left text-xs border-collapse">
+                  <thead className="bg-slate-100/90 border-b border-slate-300 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
                     <tr>
-                      <th className="py-3 px-4">Admission #</th>
-                      <th className="py-3 px-4">Admitted</th>
-                      <th className="py-3 px-4">Discharged</th>
-                      <th className="py-3 px-4">Ward & Bed</th>
-                      <th className="py-3 px-4">Attending Doctor</th>
-                      <th className="py-3 px-4">Diagnosis</th>
-                      <th className="py-3 px-4">Status</th>
-                      <th className="py-3 px-4 text-right">Action</th>
+                      <th className="py-3.5 px-4 text-slate-900 font-bold whitespace-nowrap">Admission #</th>
+                      <th className="py-3.5 px-4 text-slate-900 font-bold whitespace-nowrap">Admitted</th>
+                      <th className="py-3.5 px-4 text-slate-900 font-bold whitespace-nowrap">Discharged</th>
+                      <th className="py-3.5 px-4 text-slate-900 font-bold whitespace-nowrap">Ward & Bed</th>
+                      <th className="py-3.5 px-4 text-slate-900 font-bold whitespace-nowrap">Attending Doctor</th>
+                      <th className="py-3.5 px-4 text-slate-900 font-bold">Diagnosis</th>
+                      <th className="py-3.5 px-4 text-slate-900 font-bold whitespace-nowrap">Status</th>
+                      <th className="py-3.5 px-4 text-right text-slate-900 font-bold whitespace-nowrap">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 font-medium">
+                  <tbody className="divide-y divide-slate-200 font-medium text-slate-800">
                     {patientHistory.length > 0 ? (
                       patientHistory.map((admItem) => {
                         const isCurrent = admItem.id === admission.id;
                         const admStatus = (admItem.status || '').toLowerCase();
                         return (
-                          <tr key={admItem.id} className={isCurrent ? 'bg-blue-50/50' : 'hover:bg-slate-50/80 transition-colors'}>
-                            <td className="py-3 px-4 font-mono font-bold text-slate-900">
-                              <div className="flex items-center gap-1.5">
+                          <tr key={admItem.id} className={isCurrent ? 'bg-blue-50/60' : 'hover:bg-slate-50/90 transition-colors'}>
+                            <td className="py-3.5 px-4 font-mono font-bold text-slate-950">
+                              <div className="flex items-center gap-1.5 whitespace-nowrap">
                                 <span>{admItem.admission_number || admItem.id.slice(0, 8)}</span>
                                 {isCurrent && (
-                                  <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.2 rounded font-sans font-bold">
+                                  <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-sans font-bold">
                                     Current
                                   </span>
                                 )}
                               </div>
                             </td>
-                            <td className="py-3 px-4">{formatDateOnly(admItem.admission_date)}</td>
-                            <td className="py-3 px-4">{admItem.discharge_date ? formatDateOnly(admItem.discharge_date) : '—'}</td>
-                            <td className="py-3 px-4">{admItem.ward_name || 'General'} • {admItem.bed_number || 'Bed'}</td>
-                            <td className="py-3 px-4">{admItem.doctor_name || 'Doctor'}</td>
-                            <td className="py-3 px-4 max-w-[180px] truncate">{admItem.provisional_diagnosis || '—'}</td>
-                            <td className="py-3 px-4">
+                            <td className="py-3.5 px-4 text-slate-900 font-medium whitespace-nowrap">{formatDateOnly(admItem.admission_date)}</td>
+                            <td className="py-3.5 px-4 text-slate-800 font-medium whitespace-nowrap">{admItem.discharge_date ? formatDateOnly(admItem.discharge_date) : '—'}</td>
+                            <td className="py-3.5 px-4 font-semibold text-slate-950 whitespace-nowrap">{admItem.ward_name || 'General'} • {admItem.bed_number || 'Bed'}</td>
+                            <td className="py-3.5 px-4 text-slate-900 font-medium whitespace-nowrap">{admItem.doctor_name || 'Doctor'}</td>
+                            <td className="py-3.5 px-4 max-w-[200px] truncate text-slate-800">{admItem.provisional_diagnosis || '—'}</td>
+                            <td className="py-3.5 px-4 whitespace-nowrap">
                               <span
-                                className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold ${
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-bold ${
                                   admStatus === 'admitted'
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : 'bg-slate-200 text-slate-700'
+                                    ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                                    : 'bg-slate-200 text-slate-900 border border-slate-300'
                                 }`}
                               >
                                 {admStatus === 'admitted' ? 'Active' : 'Discharged'}
                               </span>
                             </td>
-                            <td className="py-3 px-4 text-right">
+                            <td className="py-3.5 px-4 text-right whitespace-nowrap">
                               {isCurrent ? (
-                                <span className="text-slate-400 text-xs italic">Viewing</span>
+                                <span className="text-slate-500 text-xs font-semibold italic">Viewing</span>
                               ) : (
                                 <button
                                   onClick={() => router.push(`/doctor-dashboard/ipd/${admItem.id}`)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded border border-blue-200 transition-colors"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-blue-700 hover:text-blue-800 hover:bg-blue-50 rounded border border-blue-300 transition-colors cursor-pointer"
                                 >
                                   Open Profile
                                   <ChevronRight className="w-3.5 h-3.5" />
@@ -1236,8 +1837,91 @@ export default function InpatientProfilePage() {
                       })
                     ) : (
                       <tr>
-                        <td colSpan={8} className="py-4 px-4 text-center text-slate-400">
+                        <td colSpan={8} className="py-6 px-4 text-center text-slate-600 font-medium">
                           This is the patient&apos;s first admission record at this clinic.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Inpatient Transfer History Table */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden max-w-full">
+              <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <ArrowRightLeft className="w-4 h-4 text-blue-600" />
+                    Inpatient Transfer History
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Chronological audit of ward and bed movements for this admission.
+                  </p>
+                </div>
+                <span className="text-xs font-semibold px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md">
+                  Total Transfers: {(admission?.transferHistory || []).length}
+                </span>
+              </div>
+
+              <div className="overflow-x-auto max-w-full">
+                <table className="w-full min-w-[760px] text-left text-xs border-collapse">
+                  <thead className="bg-slate-100/90 border-b border-slate-300 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
+                    <tr>
+                      <th className="py-3.5 px-4 text-slate-900 font-bold whitespace-nowrap">Date & Time</th>
+                      <th className="py-3.5 px-4 text-slate-900 font-bold whitespace-nowrap">From (Source)</th>
+                      <th className="py-3.5 px-4 text-slate-900 font-bold whitespace-nowrap">To (Destination)</th>
+                      <th className="py-3.5 px-4 text-slate-900 font-bold whitespace-nowrap">Initiating Doctor</th>
+                      <th className="py-3.5 px-4 text-slate-900 font-bold whitespace-nowrap">Executing Nurse</th>
+                      <th className="py-3.5 px-4 text-slate-900 font-bold">Reason / Notes</th>
+                      <th className="py-3.5 px-4 text-center text-slate-900 font-bold whitespace-nowrap">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 font-medium text-slate-800">
+                    {(admission?.transferHistory && admission.transferHistory.length > 0) ? (
+                      admission.transferHistory.map((tr) => (
+                        <tr key={tr.id} className="hover:bg-slate-50/90 transition-colors">
+                          <td className="py-3.5 px-4 font-mono text-slate-900 font-semibold whitespace-nowrap">
+                            {formatDateTime(tr.executedAt || tr.executed_at || tr.initiatedAt || tr.initiated_at || tr.createdAt)}
+                          </td>
+                          <td className="py-3.5 px-4 font-semibold text-slate-950 whitespace-nowrap">
+                            {tr.sourceWardName || 'Source Ward'} • Bed {tr.sourceBedNumber || 'Bed'}
+                          </td>
+                          <td className="py-3.5 px-4 font-semibold text-slate-950 whitespace-nowrap">
+                            {tr.destinationWardName || 'Dest Ward'} • Bed {tr.destinationBedNumber || 'Bed'}
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-900 font-medium whitespace-nowrap">
+                            {tr.initiatingDoctorName || 'Doctor'}
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-900 font-medium whitespace-nowrap">
+                            {tr.executingNurseName || (tr.status === 'APPROVED' ? <span className="italic text-amber-700 font-bold">Pending Execution</span> : '—')}
+                          </td>
+                          <td className="py-3.5 px-4 max-w-[200px]">
+                            {tr.reason && <p className="font-semibold text-slate-900 truncate">{tr.reason}</p>}
+                            {tr.movementNotes && <p className="text-[11px] text-slate-600 italic truncate">{tr.movementNotes}</p>}
+                            {!tr.reason && !tr.movementNotes && <span className="text-slate-400">—</span>}
+                          </td>
+                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                            <span
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-bold ${
+                                tr.status === 'COMPLETED'
+                                  ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                                  : tr.status === 'APPROVED'
+                                  ? 'bg-amber-100 text-amber-950 border border-amber-300'
+                                  : tr.status === 'CANCELLED'
+                                  ? 'bg-rose-100 text-rose-900 border border-rose-300'
+                                  : 'bg-slate-100 text-slate-800 border border-slate-300'
+                              }`}
+                            >
+                              {tr.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="py-6 px-4 text-center text-slate-600 font-medium">
+                          No transfer records for this inpatient admission.
                         </td>
                       </tr>
                     )}
@@ -1320,15 +2004,15 @@ export default function InpatientProfilePage() {
             {vitalsHistory.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs text-slate-700">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
+                  <thead className="bg-slate-100/90 border-b border-slate-300 text-slate-900 font-bold uppercase tracking-wider text-[11px]">
                     <tr>
-                      <th className="py-3 px-4">Timestamp</th>
-                      <th className="py-3 px-4">Clinician</th>
-                      <th className="py-3 px-4">Blood Pressure</th>
-                      <th className="py-3 px-4">Pulse (bpm)</th>
-                      <th className="py-3 px-4">Temperature (°F)</th>
-                      <th className="py-3 px-4">SpO2 (%)</th>
-                      <th className="py-3 px-4">Clinical Alerts</th>
+                      <th className="py-3.5 px-4 text-slate-900 font-bold">Timestamp</th>
+                      <th className="py-3.5 px-4 text-slate-900 font-bold">Clinician</th>
+                      <th className="py-3.5 px-4 text-slate-900 font-bold">Blood Pressure</th>
+                      <th className="py-3.5 px-4 text-slate-900 font-bold">Pulse (bpm)</th>
+                      <th className="py-3.5 px-4 text-slate-900 font-bold">Temperature (°F)</th>
+                      <th className="py-3.5 px-4 text-slate-900 font-bold">SpO2 (%)</th>
+                      <th className="py-3.5 px-4 text-slate-900 font-bold">Clinical Alerts</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium">
@@ -1637,22 +2321,634 @@ export default function InpatientProfilePage() {
                 )}
               </div>
             </div>
+
+            {/* Nursing Care Notes & Shift Handover Section (Read-Only) */}
+            <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                    <FileText className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-slate-900">Bedside Nursing Care Notes & Shift Handover</h3>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                        Read-Only View
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      Chronological observations, nursing interventions, and handover items documented by nursing staff
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500 font-medium">
+                    {nursingNotes.length} Note{nursingNotes.length === 1 ? '' : 's'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={loadNursingNotes}
+                    disabled={loadingNursingNotes}
+                    className="p-1.5 text-slate-500 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                    title="Refresh Nursing Notes"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${loadingNursingNotes ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+              </div>
+
+              {loadingNursingNotes ? (
+                <div className="py-8 text-center text-xs text-slate-400">
+                  <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-slate-300" />
+                  Loading nursing notes...
+                </div>
+              ) : nursingNotes.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-xl">
+                  No nursing care notes or shift handover entries recorded yet for this admission.
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                  {nursingNotes.map((note) => {
+                    const isHandover = (note.note_type || note.noteType) === 'Shift Handover';
+                    const condition = note.patient_condition || note.patientCondition;
+                    const recordedDate = note.recorded_at || note.created_at || note.createdAt;
+                    const authorName = note.nurse_name || note.nurseName || note.author_name || 'Staff Nurse';
+                    const observations = note.nursing_observations || note.nursingObservations;
+                    const interventions = note.interventions;
+                    const handoverNotes = note.handover_notes || note.handoverNotes;
+
+                    return (
+                      <div
+                        key={note.id || note._id}
+                        className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2.5 transition-colors hover:border-slate-300"
+                      >
+                        <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+                                isHandover
+                                  ? 'bg-purple-100 text-purple-700 border-purple-200'
+                                  : 'bg-blue-100 text-blue-700 border-blue-200'
+                              }`}
+                            >
+                              {note.note_type || note.noteType || 'Nursing Note'}
+                            </span>
+                            {condition && (
+                              <span
+                                className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+                                  condition === 'Critical'
+                                    ? 'bg-rose-100 text-rose-700 border-rose-200'
+                                    : condition === 'Guarded'
+                                    ? 'bg-amber-100 text-amber-700 border-amber-200'
+                                    : 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                                }`}
+                              >
+                                {condition}
+                              </span>
+                            )}
+                          </div>
+
+                          <span className="text-[11px] text-slate-500 font-mono">
+                            {formatDateTime(recordedDate)}
+                          </span>
+                        </div>
+
+                        <div className="text-xs text-slate-700 space-y-2">
+                          {observations && (
+                            <div>
+                              <span className="font-semibold text-slate-900 text-[11px] block">Observations & Assessment:</span>
+                              <p className="text-slate-600 whitespace-pre-line pl-2 border-l-2 border-blue-200 mt-0.5">
+                                {observations}
+                              </p>
+                            </div>
+                          )}
+
+                          {interventions && (
+                            <div>
+                              <span className="font-semibold text-slate-900 text-[11px] block">Nursing Care & Interventions:</span>
+                              <p className="text-slate-600 whitespace-pre-line pl-2 border-l-2 border-emerald-200 mt-0.5">
+                                {interventions}
+                              </p>
+                            </div>
+                          )}
+
+                          {handoverNotes && (
+                            <div>
+                              <span className="font-semibold text-slate-900 text-[11px] block">Shift Handover & Follow-up:</span>
+                              <p className="text-slate-600 whitespace-pre-line pl-2 border-l-2 border-purple-200 mt-0.5">
+                                {handoverNotes}
+                              </p>
+                            </div>
+                          )}
+
+                          {!observations && !interventions && !handoverNotes && (
+                            <p className="text-slate-600 whitespace-pre-line">{note.note || note.notes || '—'}</p>
+                          )}
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                          <span>Documented by: <strong className="text-slate-700">{authorName}</strong></span>
+                          {note.id && <span className="font-mono text-[10px] text-slate-400">ID: {String(note.id).slice(0, 8)}</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
-        {/* TAB 5: MEDICATIONS */}
+        {/* TAB 5: MEDICATIONS (INPATIENT PRESCRIPTIONS & MAR AUDIT) */}
         {activeTab === 'medications' && (
-          <div className="bg-white rounded-xl border border-slate-200 p-8 text-center shadow-xs">
-            <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mx-auto mb-3">
-              <Pill className="w-6 h-6" />
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <Pill className="w-4 h-4 text-purple-600" />
+                  Inpatient Prescription Orders & MAR Audit
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Doctor-authorized inpatient medication regimens and bedside nursing administration records.
+                </p>
+              </div>
+
+              {admission?.status !== 'discharged' && (
+                <button
+                  type="button"
+                  id="btn-doc-prescribe-med"
+                  onClick={() => {
+                    setPrescribeForm({
+                      medication_name: '',
+                      dosage: '',
+                      route: 'Oral',
+                      frequency: 'TDS',
+                      schedule: '',
+                      instructions: '',
+                      duration: '5 days'
+                    });
+                    setPrescribeError('');
+                    setPrescribeModalOpen(true);
+                  }}
+                  className="px-4 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-lg shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Prescribe Inpatient Medication</span>
+                </button>
+              )}
             </div>
-            <h4 className="text-sm font-bold text-slate-900">Inpatient Pharmacy & MAR Integration</h4>
-            <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto leading-relaxed">
-              Inpatient medication dispensing and bedside MAR schedules are managed through the dedicated Pharmacy Dispensing workflow. Outpatient discharge prescriptions can be issued via the Consultation module.
-            </p>
-            <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-600 rounded text-xs font-mono">
-              Status: No active inpatient orders linked directly to this admission record
+
+            {prescribeSuccess && (
+              <div className="p-4 bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 rounded-xl flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{prescribeSuccess}</span>
+              </div>
+            )}
+
+            {/* Active Prescriptions Table */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    Active Prescriptions ({medicationsData.prescriptions?.length || 0})
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-0.5">Approved clinical orders currently dispensing at bedside.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={fetchMedications}
+                  className="text-xs text-purple-600 hover:underline flex items-center gap-1 font-semibold"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingMeds ? 'animate-spin' : ''}`} />
+                  Refresh
+                </button>
+              </div>
+
+              {loadingMeds ? (
+                <div className="p-8 text-center text-xs text-slate-500">Loading prescription orders...</div>
+              ) : (medicationsData.prescriptions || []).length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-500">
+                  No active inpatient prescriptions on file for this admission. Click &quot;Prescribe Inpatient Medication&quot; above to issue orders.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-100/90 border-b border-slate-300">
+                      <tr className="font-bold uppercase tracking-wider text-[11px] text-slate-900">
+                        <th className="px-4 py-3.5 text-slate-900 font-bold">Medication</th>
+                        <th className="px-4 py-3.5 text-slate-900 font-bold">Dose & Route</th>
+                        <th className="px-4 py-3.5 text-slate-900 font-bold">Frequency & Schedule</th>
+                        <th className="px-4 py-3.5 text-slate-900 font-bold">Prescription Instructions</th>
+                        <th className="px-4 py-3.5 text-slate-900 font-bold">Physician</th>
+                        <th className="px-4 py-3.5 text-center text-slate-900 font-bold">Status</th>
+                        <th className="px-4 py-3.5 text-right text-slate-900 font-bold">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {medicationsData.prescriptions.map((pres) => {
+                        const isDiscontinued = (pres.status || '').toLowerCase() === 'discontinued';
+                        return (
+                          <tr key={pres.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="px-4 py-3 font-bold text-slate-900">
+                              <div>{pres.medication_name || pres.medicationName}</div>
+                              {isDiscontinued && (
+                                <span className="text-[10px] text-rose-600 font-semibold block mt-0.5">Discontinued Medication</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="font-semibold text-slate-800">{pres.dosage || pres.dose}</span>
+                              <span className="text-slate-500"> ({pres.route})</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="font-semibold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded mr-1.5">{pres.frequency}</span>
+                              <span className="font-mono text-slate-500 text-[11px]">
+                                {Array.isArray(pres.schedule || pres.schedule_times) ? (pres.schedule || pres.schedule_times).join(', ') : 'Standard'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-slate-600 max-w-xs">
+                              <div>{pres.instructions || 'Standard hospital protocol'}</div>
+                              {isDiscontinued && (
+                                <div className="mt-1 text-[11px] text-rose-700 font-semibold bg-rose-50/70 px-2 py-0.5 rounded border border-rose-200/60">
+                                  Discontinued: &quot;{pres.discontinuation_reason || pres.discontinuationReason || 'Clinical discontinuation'}&quot;
+                                  {pres.discontinued_at && (
+                                    <span className="text-[10px] text-slate-500 font-normal block">
+                                      on {new Date(pres.discontinued_at).toLocaleDateString([], { month: 'short', day: '2-digit' })} by {pres.discontinued_by_name || pres.discontinuedByName || 'Doctor'}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-slate-700 font-medium">{pres.doctor_name || pres.doctorName || 'Attending Physician'}</td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                isDiscontinued
+                                  ? 'bg-slate-100 text-slate-700 border border-slate-200'
+                                  : 'bg-emerald-100 text-emerald-800'
+                              }`}>
+                                {isDiscontinued ? 'Discontinued' : (pres.status || 'Active')}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {!isDiscontinued && admission?.status !== 'discharged' ? (
+                                <button
+                                  type="button"
+                                  id={`btn-discontinue-${pres.id}`}
+                                  onClick={() => setDiscontinueModal({
+                                    isOpen: true,
+                                    prescription: pres,
+                                    reasonPreset: 'Therapy Completed / Condition Improved',
+                                    reasonText: '',
+                                    isSubmitting: false,
+                                    error: ''
+                                  })}
+                                  className="px-2.5 py-1 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors cursor-pointer"
+                                  title="Discontinue this medication regimen"
+                                >
+                                  Discontinue
+                                </button>
+                              ) : (
+                                <span className="text-xs text-slate-400 italic">
+                                  {isDiscontinued ? 'Discontinued' : '—'}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
+
+            {/* Bedside Nursing MAR Administration History */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    Bedside Nurse Administration History ({medicationsData.marRecords?.length || 0})
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-0.5">Chronological eMAR log recorded by assigned nursing staff.</p>
+                </div>
+              </div>
+
+              {(medicationsData.marRecords || []).length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-400 italic">
+                  No bedside doses have been administered or documented yet.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-100/90 border-b border-slate-300">
+                      <tr className="font-bold uppercase tracking-wider text-[11px] text-slate-900">
+                        <th className="px-4 py-3.5 text-slate-900 font-bold">Timestamp</th>
+                        <th className="px-4 py-3.5 text-slate-900 font-bold">Medication</th>
+                        <th className="px-4 py-3.5 text-slate-900 font-bold">Dose Given</th>
+                        <th className="px-4 py-3.5 text-slate-900 font-bold">Route</th>
+                        <th className="px-4 py-3.5 text-slate-900 font-bold">Status</th>
+                        <th className="px-4 py-3.5 text-slate-900 font-bold">Clinical Reason / Notes</th>
+                        <th className="px-4 py-3.5 text-slate-900 font-bold">Acting Nurse</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {medicationsData.marRecords.map((rec) => (
+                        <tr key={rec.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-4 py-3 font-mono text-[11px] text-slate-600 whitespace-nowrap">
+                            {new Date(rec.administered_at || rec.administeredAt || rec.created_at).toLocaleString([], {
+                              month: 'short',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </td>
+                          <td className="px-4 py-3 font-bold text-slate-900">{rec.medication_name || rec.medicationName}</td>
+                          <td className="px-4 py-3 font-semibold text-slate-800">{rec.administered_dose || rec.prescribed_dose || '—'}</td>
+                          <td className="px-4 py-3 text-slate-600">{rec.route || 'Oral'}</td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              rec.status === 'ADMINISTERED' ? 'bg-emerald-100 text-emerald-800' :
+                              rec.status === 'MISSED' ? 'bg-rose-100 text-rose-800' :
+                              'bg-purple-100 text-purple-800'
+                            }`}>
+                              {rec.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-slate-600 max-w-xs">
+                            {rec.reason && <span className="font-semibold text-rose-700 block text-[11px]">Reason: &quot;{rec.reason}&quot;</span>}
+                            {rec.notes && <span className="text-slate-500 italic block text-[11px]">{rec.notes}</span>}
+                            {!rec.reason && !rec.notes && <span className="text-slate-400">—</span>}
+                          </td>
+                          <td className="px-4 py-3 text-slate-700 font-medium">{rec.nurse_name || rec.nurseName || 'Staff Nurse'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* DOCTOR PRESCRIBE INPATIENT MEDICATION MODAL */}
+            {prescribeModalOpen && (
+              <ModalPortal isOpen={prescribeModalOpen} onClose={() => setPrescribeModalOpen(false)}>
+                <div
+                  className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs"
+                  onClick={(e) => {
+                    if (e.target === e.currentTarget) setPrescribeModalOpen(false);
+                  }}
+                >
+                  <div className="w-full max-w-md max-h-[90vh] flex flex-col bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden animate-in fade-in duration-200">
+                    <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-purple-50/50 shrink-0">
+                      <div className="flex items-center gap-2">
+                        <Pill className="w-5 h-5 text-purple-700" />
+                        <h3 className="text-sm font-bold text-slate-900">Prescribe Inpatient Medication</h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPrescribeModalOpen(false)}
+                        className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleCreatePrescription} className="p-6 space-y-4 overflow-y-auto">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          Medication Name & Strength <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={prescribeForm.medication_name}
+                          onChange={(e) => setPrescribeForm(prev => ({ ...prev, medication_name: e.target.value }))}
+                          placeholder="e.g. Paracetamol 500mg, Ceftriaxone 1g"
+                          className="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white font-medium"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Prescribed Dose <span className="text-rose-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={prescribeForm.dosage}
+                            onChange={(e) => setPrescribeForm(prev => ({ ...prev, dosage: e.target.value }))}
+                            placeholder="e.g. 500mg, 1 tab, 1g"
+                            className="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white font-medium"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Route <span className="text-rose-500">*</span>
+                          </label>
+                          <select
+                            value={prescribeForm.route}
+                            onChange={(e) => setPrescribeForm(prev => ({ ...prev, route: e.target.value }))}
+                            className="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white font-medium"
+                          >
+                            <option value="Oral">Oral (PO)</option>
+                            <option value="IV">Intravenous (IV)</option>
+                            <option value="IM">Intramuscular (IM)</option>
+                            <option value="SC">Subcutaneous (SC)</option>
+                            <option value="Inhalation">Inhalation</option>
+                            <option value="Topical">Topical</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Frequency <span className="text-rose-500">*</span>
+                          </label>
+                          <select
+                            value={prescribeForm.frequency}
+                            onChange={(e) => setPrescribeForm(prev => ({ ...prev, frequency: e.target.value }))}
+                            className="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white font-medium"
+                          >
+                            <option value="OD">OD (Once Daily)</option>
+                            <option value="BD">BD (Twice Daily)</option>
+                            <option value="TDS">TDS (Thrice Daily)</option>
+                            <option value="QID">QID (Four Times Daily)</option>
+                            <option value="Q4H">Q4H (Every 4 Hours)</option>
+                            <option value="Q6H">Q6H (Every 6 Hours)</option>
+                            <option value="Q8H">Q8H (Every 8 Hours)</option>
+                            <option value="STAT">STAT (Immediate Single Dose)</option>
+                            <option value="PRN">PRN (As Needed)</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Duration
+                          </label>
+                          <input
+                            type="text"
+                            value={prescribeForm.duration}
+                            onChange={(e) => setPrescribeForm(prev => ({ ...prev, duration: e.target.value }))}
+                            placeholder="e.g. 5 days, admission course"
+                            className="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white font-medium"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          Instructions & Precautions
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={prescribeForm.instructions}
+                          onChange={(e) => setPrescribeForm(prev => ({ ...prev, instructions: e.target.value }))}
+                          placeholder="e.g. Take after food, monitor temperature spikes, check IV cannula..."
+                          className="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white font-medium"
+                        />
+                      </div>
+
+                      {prescribeError && (
+                        <div className="p-3 bg-rose-50 border border-rose-200 text-xs text-rose-800 rounded-lg flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                          <span>{prescribeError}</span>
+                        </div>
+                      )}
+
+                      <div className="pt-2 flex items-center justify-end gap-2.5 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => setPrescribeModalOpen(false)}
+                          className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={prescribeSubmitting}
+                          className="px-5 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 rounded-lg shadow-sm"
+                        >
+                          {prescribeSubmitting ? 'Prescribing...' : 'Authorize Prescription'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </ModalPortal>
+            )}
+
+            {/* DOCTOR DISCONTINUE INPATIENT MEDICATION MODAL */}
+            {discontinueModal.isOpen && discontinueModal.prescription && (
+              <ModalPortal isOpen={discontinueModal.isOpen} onClose={() => setDiscontinueModal(prev => ({ ...prev, isOpen: false }))}>
+                <div
+                  className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs"
+                  onClick={(e) => {
+                    if (e.target === e.currentTarget) setDiscontinueModal(prev => ({ ...prev, isOpen: false }));
+                  }}
+                >
+                  <div className="w-full max-w-md max-h-[90vh] flex flex-col bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden animate-in fade-in duration-200">
+                    <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-rose-50/70 shrink-0">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="w-5 h-5 text-rose-600" />
+                        <h3 className="text-sm font-bold text-slate-900">Discontinue Inpatient Medication</h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setDiscontinueModal(prev => ({ ...prev, isOpen: false }))}
+                        className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleDiscontinuePrescription} className="p-6 space-y-4 overflow-y-auto">
+                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                        <div className="text-xs font-bold text-slate-900">
+                          {discontinueModal.prescription.medication_name || discontinueModal.prescription.medicationName}
+                        </div>
+                        <div className="text-xs text-slate-600">
+                          Dose: <span className="font-semibold">{discontinueModal.prescription.dosage || discontinueModal.prescription.dose}</span> • Route: <span className="font-semibold">{discontinueModal.prescription.route}</span> • Frequency: <span className="font-semibold">{discontinueModal.prescription.frequency}</span>
+                        </div>
+                        {discontinueModal.prescription.instructions && (
+                          <div className="text-[11px] text-slate-500 italic mt-0.5">
+                            Instructions: {discontinueModal.prescription.instructions}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs space-y-1">
+                        <div className="font-bold flex items-center gap-1.5">
+                          <AlertTriangle className="w-4 h-4 text-amber-700" />
+                          <span>Clinical Confirmation Required</span>
+                        </div>
+                        <p className="text-[11px] text-amber-800">
+                          Discontinuing this prescription will stop all future scheduled doses from being generated. Past administration history and nursing logs will be permanently retained in the patient audit record.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          Select Preset Discontinuation Reason
+                        </label>
+                        <select
+                          value={discontinueModal.reasonPreset}
+                          onChange={(e) => setDiscontinueModal(prev => ({ ...prev, reasonPreset: e.target.value }))}
+                          className="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white font-medium"
+                        >
+                          <option value="Therapy Completed / Condition Improved">Therapy Completed / Condition Improved</option>
+                          <option value="Adverse Reaction / Drug Intolerance">Adverse Reaction / Drug Intolerance</option>
+                          <option value="Substituted / Regimen Altered">Substituted / Regimen Altered</option>
+                          <option value="Condition Resolved / No Longer Indicated">Condition Resolved / No Longer Indicated</option>
+                          <option value="Patient Discharged / Converted to Oral/Outpatient">Patient Discharged / Converted to Oral/Outpatient</option>
+                          <option value="Attending Physician Discretion">Attending Physician Discretion</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          Clinical Reason Details <span className="text-rose-500">*</span>
+                        </label>
+                        <textarea
+                          rows={2}
+                          required
+                          value={discontinueModal.reasonText || discontinueModal.reasonPreset}
+                          onChange={(e) => setDiscontinueModal(prev => ({ ...prev, reasonText: e.target.value }))}
+                          placeholder="Provide clinical rationale for discontinuing this medication..."
+                          className="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white font-medium"
+                        />
+                      </div>
+
+                      {discontinueModal.error && (
+                        <div className="p-3 bg-rose-50 border border-rose-200 text-xs text-rose-800 rounded-lg flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                          <span>{discontinueModal.error}</span>
+                        </div>
+                      )}
+
+                      <div className="pt-2 flex items-center justify-end gap-2.5 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => setDiscontinueModal(prev => ({ ...prev, isOpen: false }))}
+                          className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          id="btn-confirm-discontinue"
+                          disabled={discontinueModal.isSubmitting}
+                          className="px-5 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 rounded-lg shadow-sm"
+                        >
+                          {discontinueModal.isSubmitting ? 'Discontinuing...' : 'Confirm Discontinue'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </ModalPortal>
+            )}
           </div>
         )}
 
@@ -1684,15 +2980,15 @@ export default function InpatientProfilePage() {
             ) : labOrders.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs text-slate-700">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
+                  <thead className="bg-slate-100/90 border-b border-slate-300 text-slate-900 font-bold uppercase tracking-wider text-[11px]">
                     <tr>
-                      <th className="py-3 px-4">Order #</th>
-                      <th className="py-3 px-4">Priority</th>
-                      <th className="py-3 px-4">Order Date</th>
-                      <th className="py-3 px-4">Doctor / Creator</th>
-                      <th className="py-3 px-4">Items / Tests</th>
-                      <th className="py-3 px-4">Status</th>
-                      <th className="py-3 px-4 text-right">Action</th>
+                      <th className="py-3.5 px-4 text-slate-900 font-bold">Order #</th>
+                      <th className="py-3.5 px-4 text-slate-900 font-bold">Priority</th>
+                      <th className="py-3.5 px-4 text-slate-900 font-bold">Order Date</th>
+                      <th className="py-3.5 px-4 text-slate-900 font-bold">Doctor / Creator</th>
+                      <th className="py-3.5 px-4 text-slate-900 font-bold">Items / Tests</th>
+                      <th className="py-3.5 px-4 text-slate-900 font-bold">Status</th>
+                      <th className="py-3.5 px-4 text-right text-slate-900 font-bold">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium">
@@ -1861,19 +3157,791 @@ export default function InpatientProfilePage() {
           </div>
         )}
 
-        {/* TAB 7: RADIOLOGY */}
+        {/* TAB 7: RADIOLOGY & DIAGNOSTIC IMAGING */}
         {activeTab === 'radiology' && (
-          <div className="bg-white rounded-xl border border-slate-200 p-8 text-center shadow-xs">
-            <div className="w-12 h-12 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center mx-auto mb-3">
-              <Radio className="w-6 h-6" />
+          <div className="space-y-6">
+            {/* Header & Actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
+                    <Radio className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-bold text-slate-900">Radiology & Diagnostic Imaging</h3>
+                      <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+                        {radiologyOrders.length} {radiologyOrders.length === 1 ? 'Order' : 'Orders'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Requisition digital X-Ray, CT, Ultrasound and MRI studies and review signed specialist diagnostic reports
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={loadRadiologyOrders}
+                  disabled={loadingRadiologyOrders}
+                  className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                  title="Refresh Orders"
+                >
+                  <RefreshCw className={`w-4 h-4 ${loadingRadiologyOrders ? 'animate-spin text-sky-600' : ''}`} />
+                  <span className="hidden sm:inline">Refresh</span>
+                </button>
+
+                {!isDischarged && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRadiologyFormError('');
+                      fetchActiveLabs(); setIsCreateRadiologyModalOpen(true);
+                    }}
+                    className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Order Radiology</span>
+                  </button>
+                )}
+              </div>
             </div>
-            <h4 className="text-sm font-bold text-slate-900">Radiology & Diagnostic Imaging</h4>
-            <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto leading-relaxed">
-              No digital imaging orders (X-Ray, Ultrasound, CT, MRI) currently recorded for this admission. Digital PACS & DICOM imaging requisition module is scheduled for integration.
-            </p>
-            <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-600 rounded text-xs font-mono">
-              Status: PACS Module Not Configured
+
+            {/* Quick Metrics Bar */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div
+                onClick={() => setRadiologyFilter('ALL')}
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
+                  radiologyFilter === 'ALL'
+                    ? 'bg-sky-50/60 border-sky-300 shadow-xs'
+                    : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <div className="text-[11px] font-medium text-slate-500">Total Imaging Orders</div>
+                <div className="text-lg font-bold text-slate-900 mt-1">{radiologyOrders.length}</div>
+              </div>
+
+              <div
+                onClick={() => setRadiologyFilter('ORDERED')}
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
+                  radiologyFilter === 'ORDERED'
+                    ? 'bg-blue-50/60 border-blue-300 shadow-xs'
+                    : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <div className="text-[11px] font-medium text-slate-500">Awaiting Dispatch</div>
+                <div className="text-lg font-bold text-blue-600 mt-1">
+                  {radiologyOrders.filter(o => o.status === 'ORDERED').length}
+                </div>
+              </div>
+
+              <div
+                onClick={() => setRadiologyFilter('IN_PROGRESS')}
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
+                  radiologyFilter === 'IN_PROGRESS'
+                    ? 'bg-amber-50/60 border-amber-300 shadow-xs'
+                    : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <div className="text-[11px] font-medium text-slate-500">In Suite / Scanning</div>
+                <div className="text-lg font-bold text-amber-600 mt-1">
+                  {radiologyOrders.filter(o => o.status === 'IN_PROGRESS').length}
+                </div>
+              </div>
+
+              <div
+                onClick={() => setRadiologyFilter('COMPLETED')}
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
+                  radiologyFilter === 'COMPLETED'
+                    ? 'bg-emerald-50/60 border-emerald-300 shadow-xs'
+                    : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <div className="text-[11px] font-medium text-slate-500">Reports Finalized</div>
+                <div className="text-lg font-bold text-emerald-600 mt-1">
+                  {radiologyOrders.filter(o => o.status === 'COMPLETED').length}
+                </div>
+              </div>
             </div>
+
+            {/* Orders List / Table */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+              {loadingRadiologyOrders ? (
+                <div className="p-12 text-center text-slate-500 text-xs flex flex-col items-center justify-center gap-2">
+                  <RefreshCw className="w-5 h-5 animate-spin text-sky-600" />
+                  <span>Loading patient radiology orders & diagnostic imaging history...</span>
+                </div>
+              ) : radiologyOrders.length === 0 ? (
+                <div className="p-12 text-center">
+                  <div className="w-14 h-14 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center mx-auto mb-3">
+                    <Radio className="w-7 h-7" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800">No Radiology Orders Recorded</h4>
+                  <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
+                    No X-Ray, Ultrasound, CT Scan or MRI investigations have been ordered for this admission yet.
+                  </p>
+                  {!isDischarged && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRadiologyFormError('');
+                        fetchActiveLabs(); setIsCreateRadiologyModalOpen(true);
+                      }}
+                      className="mt-4 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Requisition First Investigation</span>
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-slate-50/90 text-slate-900 border-b border-slate-200">
+                      <tr>
+                        <th className="py-3.5 px-4 font-bold">Order # & Date</th>
+                        <th className="py-3.5 px-4 font-bold">Investigation / Study</th>
+                        <th className="py-3.5 px-4 font-bold">Clinical Indication</th>
+                        <th className="py-3.5 px-4 font-bold">Priority</th>
+                        <th className="py-3.5 px-4 font-bold">Transport Mode</th>
+                        <th className="py-3.5 px-4 font-bold">Workflow Status</th>
+                        <th className="py-3.5 px-4 font-bold text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {radiologyOrders
+                        .filter(o => radiologyFilter === 'ALL' || o.status === radiologyFilter)
+                        .map(order => {
+                          const type = order.investigation_type || 'X-Ray';
+                          let typeBadge = 'bg-sky-50 text-sky-700 border-sky-200';
+                          if (type === 'CT Scan') typeBadge = 'bg-purple-50 text-purple-700 border-purple-200';
+                          else if (type === 'Ultrasound') typeBadge = 'bg-teal-50 text-teal-700 border-teal-200';
+                          else if (type === 'MRI') typeBadge = 'bg-indigo-50 text-indigo-700 border-indigo-200';
+
+                          const priority = (order.priority || 'routine').toLowerCase();
+                          let priorityBadge = 'bg-slate-100 text-slate-700';
+                          if (priority.includes('stat') || priority === 'critical') {
+                            priorityBadge = 'bg-rose-100 text-rose-800 font-bold';
+                          } else if (priority === 'urgent') {
+                            priorityBadge = 'bg-amber-100 text-amber-800 font-bold';
+                          }
+
+                          const status = order.status || 'ORDERED';
+                          let statusBadge = 'bg-blue-50 text-blue-700 border-blue-200';
+                          if (status === 'IN_PROGRESS') statusBadge = 'bg-amber-50 text-amber-700 border-amber-200';
+                          else if (status === 'COMPLETED') statusBadge = 'bg-emerald-50 text-emerald-700 border-emerald-200 font-bold';
+                          else if (status === 'CANCELLED') statusBadge = 'bg-slate-100 text-slate-500 border-slate-200';
+
+                          const hasReport = status === 'COMPLETED' && order.report;
+
+                          return (
+                            <tr key={order.id} className="hover:bg-slate-50/70 transition-colors">
+                              <td className="py-3 px-4 whitespace-nowrap">
+                                <span className="font-mono font-semibold text-slate-800 block">{order.order_number || order.id?.slice(0, 8)}</span>
+                                <span className="text-[11px] text-slate-400 block mt-0.5">{formatDateTime(order.created_at)}</span>
+                                <span className="text-[10px] text-sky-700 font-medium block mt-0.5">To: {order.lab_name || order.destination_lab?.name || 'Diagnostic Center'}</span>
+                              </td>
+
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-2">
+                                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${typeBadge}`}>
+                                    {type}
+                                  </span>
+                                  <span className="font-semibold text-slate-900">{order.study_name}</span>
+                                </div>
+                                <div className="text-[11px] text-slate-500 mt-0.5 font-medium flex items-center gap-1.5">
+                                  <span>Tariff:</span>
+                                  {order.price !== null && order.price !== undefined ? (
+                                    <span className="text-emerald-700 font-bold font-mono">₹{order.price}</span>
+                                  ) : order.total_amount !== null && order.total_amount !== undefined ? (
+                                    <span className="text-emerald-700 font-bold font-mono">₹{order.total_amount}</span>
+                                  ) : (
+                                    <span className="text-slate-400 italic">Unset</span>
+                                  )}
+                                </div>
+                                {order.instructions && (
+                                  <p className="text-[11px] text-slate-500 mt-1 line-clamp-1 italic">
+                                    Note: {order.instructions}
+                                  </p>
+                                )}
+                              </td>
+
+                              <td className="py-3 px-4 max-w-xs">
+                                <span className="text-slate-700 line-clamp-2">{order.clinical_indication}</span>
+                              </td>
+
+                              <td className="py-3 px-4 whitespace-nowrap">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wide ${priorityBadge}`}>
+                                  {order.priority || 'routine'}
+                                </span>
+                              </td>
+
+                              <td className="py-3 px-4 whitespace-nowrap capitalize text-slate-600">
+                                {order.transport_mode ? order.transport_mode.replace('_', ' ') : 'Ambulatory'}
+                              </td>
+
+                              <td className="py-3 px-4 whitespace-nowrap">
+                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] border ${statusBadge}`}>
+                                  {status === 'COMPLETED' && <CheckCircle2 className="w-3 h-3 text-emerald-600" />}
+                                  {status === 'IN_PROGRESS' && <Clock className="w-3 h-3 text-amber-600 animate-spin" />}
+                                  {status}
+                                </span>
+                              </td>
+
+                              <td className="py-3 px-4 text-right whitespace-nowrap">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {hasReport ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => setViewingRadiologyOrder(order)}
+                                      className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                      <span>View Report</span>
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => setViewingRadiologyOrder(order)}
+                                      className="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-medium inline-flex items-center gap-1 transition-colors cursor-pointer"
+                                    >
+                                      <Info className="w-3.5 h-3.5" />
+                                      <span>Details</span>
+                                    </button>
+                                  )}
+
+                                  {!isDischarged && (status === 'ORDERED' || status === 'IN_PROGRESS') && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setCancellingRadiologyOrder(order);
+                                        setRadiologyCancelReason('');
+                                      }}
+                                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                      title="Cancel Radiology Order"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* MODAL 1: ORDER RADIOLOGY INVESTIGATION */}
+            {isCreateRadiologyModalOpen && (
+              <ModalPortal isOpen={Boolean(isCreateRadiologyModalOpen)} onClose={() => setIsCreateRadiologyModalOpen(false)}>
+                <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+                  <div className="bg-white rounded-2xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]">
+                    {/* Header */}
+                    <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-sky-50/50 shrink-0">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-sky-600 text-white flex items-center justify-center shadow-xs">
+                          <Radio className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h3 className="text-base font-bold text-slate-900">Order Radiology Investigation</h3>
+                          <p className="text-xs text-slate-500">Inpatient Diagnostic Imaging Requisition</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsCreateRadiologyModalOpen(false)}
+                        className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    {/* Patient Context Tag */}
+                    <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-xs text-slate-600 shrink-0">
+                      <div>Patient: <strong className="text-slate-800">{admission?.patientName || admission?.patient?.name || 'Inpatient'}</strong></div>
+                      <div>Admission #: <strong className="font-mono text-slate-800">{admission?.admission_number || admission?.admissionNumber || admission?.id?.slice(0, 8)}</strong></div>
+                    </div>
+
+                    {/* Body Form */}
+                    <form onSubmit={handleCreateRadiologyOrder} className="p-5 space-y-4 overflow-y-auto flex-1">
+                      {radiologyFormError && (
+                        <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                          <span>{radiologyFormError}</span>
+                        </div>
+                      )}
+
+                      {/* Destination Laboratory Selector */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                          Destination Diagnostic Facility <span className="text-rose-500">*</span>
+                        </label>
+                        {loadingActiveLabs ? (
+                          <div className="text-xs text-slate-500 py-2">Loading active diagnostic centers...</div>
+                        ) : activeLabs.length === 0 ? (
+                          <div className="text-xs text-amber-700 bg-amber-50 p-2.5 rounded-xl border border-amber-200">
+                            No active laboratories found. Please contact administration.
+                          </div>
+                        ) : (
+                          <select
+                            id="rad-select-destination-lab"
+                            value={radiologyForm.lab_id || ''}
+                            onChange={(e) => {
+                              const lid = e.target.value;
+                              const matched = activeLabs.find(l => (l.id === lid || l._id === lid));
+                              setRadiologyForm(prev => ({
+                                ...prev,
+                                lab_id: lid,
+                                lab_name: matched?.lab_name || matched?.name || ''
+                              }));
+                            }}
+                            className="w-full text-xs font-medium px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer"
+                            required
+                          >
+                            <option value="">-- Select Destination Diagnostic Laboratory --</option>
+                            {activeLabs.map(lab => (
+                              <option key={lab.id || lab._id} value={lab.id || lab._id}>
+                                {lab.lab_name || lab.name} {lab.city ? `(${lab.city})` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+
+                      {/* Modality Selector */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-2">Investigation Modality</label>
+                        <div className="grid grid-cols-4 gap-2">
+                          {[
+                            { id: 'X-Ray', label: 'X-Ray' },
+                            { id: 'CT Scan', label: 'CT Scan' },
+                            { id: 'Ultrasound', label: 'Ultrasound' },
+                            { id: 'MRI', label: 'MRI' }
+                          ].map(mod => (
+                            <button
+                              key={mod.id}
+                              type="button"
+                              onClick={() => {
+                                setRadiologyForm(prev => ({
+                                  ...prev,
+                                  investigation_type: mod.id,
+                                  study_name: '' // reset study name for chosen modality
+                                }));
+                              }}
+                              className={`py-2 px-3 rounded-xl text-xs font-semibold text-center border transition-all cursor-pointer ${
+                                radiologyForm.investigation_type === mod.id
+                                  ? 'bg-sky-600 text-white border-sky-600 shadow-xs'
+                                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                              }`}
+                            >
+                              {mod.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Common Preset Studies & Tariffs */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 mb-1.5">Common Preset Protocols & Tariffs</label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(IPD_RADIOLOGY_PRESETS[radiologyForm.investigation_type] || []).map(preset => (
+                            <button
+                              key={preset.name}
+                              type="button"
+                              onClick={() => setRadiologyForm(prev => ({
+                                ...prev,
+                                study_name: preset.name,
+                                price: preset.price
+                              }))}
+                              className={`px-2 py-1 rounded-lg text-[11px] transition-colors cursor-pointer border flex items-center gap-1.5 ${
+                                radiologyForm.study_name === preset.name
+                                  ? 'bg-sky-50 text-sky-700 border-sky-300 font-semibold'
+                                  : 'bg-slate-100 hover:bg-sky-50 hover:text-sky-700 text-slate-700 border-slate-200'
+                              }`}
+                            >
+                              <span>{preset.name}</span>
+                              <span className="font-mono text-[10px] text-emerald-700 font-bold bg-white px-1 py-0.2 rounded border border-emerald-200">
+                                ₹{preset.price}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Study Name Input & Tariff Indicator */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-xs font-bold text-slate-700">
+                            Study / Examination Description <span className="text-rose-500">*</span>
+                          </label>
+                          {radiologyForm.price !== null && radiologyForm.price !== undefined ? (
+                            <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-mono">
+                              Tariff: ₹{radiologyForm.price}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                              Tariff: Unset / Custom Study
+                            </span>
+                          )}
+                        </div>
+                        <input
+                          type="text"
+                          required
+                          value={radiologyForm.study_name}
+                          onChange={e => {
+                            const val = e.target.value;
+                            const matchedPrice = getRadiologyPresetPrice(radiologyForm.investigation_type, val);
+                            setRadiologyForm(prev => ({
+                              ...prev,
+                              study_name: val,
+                              price: matchedPrice
+                            }));
+                          }}
+                          placeholder="e.g. Chest PA View"
+                          className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+                        />
+                      </div>
+
+                      {/* Priority & Transport Mode */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">Clinical Priority</label>
+                          <select
+                            value={radiologyForm.priority}
+                            onChange={e => setRadiologyForm(prev => ({ ...prev, priority: e.target.value }))}
+                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+                          >
+                            <option value="routine">Routine (Standard Turnaround)</option>
+                            <option value="urgent">Urgent (Within 4 Hours)</option>
+                            <option value="critical_stat">Critical STAT (Immediate / Emergency)</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">Patient Transport Mode</label>
+                          <select
+                            value={radiologyForm.transport_mode}
+                            onChange={e => setRadiologyForm(prev => ({ ...prev, transport_mode: e.target.value }))}
+                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+                          >
+                            <option value="ambulatory">Ambulatory (Patient walks to suite)</option>
+                            <option value="wheelchair">Wheelchair required</option>
+                            <option value="stretcher">Stretcher / Bed transfer required</option>
+                            <option value="bedside_portable">Bedside Portable (Equipment comes to ward)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Clinical Indication */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          Clinical Indication & Diagnosis <span className="text-rose-500">*</span>
+                        </label>
+                        <textarea
+                          required
+                          rows={3}
+                          value={radiologyForm.clinical_indication}
+                          onChange={e => setRadiologyForm(prev => ({ ...prev, clinical_indication: e.target.value }))}
+                          placeholder="State clinical symptoms, working diagnosis, or suspected pathology (e.g. Acute chest pain, rule out consolidation / pneumothorax)..."
+                          className="w-full p-3 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+                        />
+                      </div>
+
+                      {/* Instructions */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          Special Instructions / Precautions (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={radiologyForm.instructions}
+                          onChange={e => setRadiologyForm(prev => ({ ...prev, instructions: e.target.value }))}
+                          placeholder="e.g. O2 cylinder required, check creatinine before contrast, pregnancy ruled out"
+                          className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+                        />
+                      </div>
+
+                      {/* Actions */}
+                      <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setIsCreateRadiologyModalOpen(false)}
+                          className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isRadiologySubmitting}
+                          className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          {isRadiologySubmitting ? (
+                            <>
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              <span>Placing Order...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Requisition Order</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </ModalPortal>
+            )}
+
+            {/* MODAL 2: RADIOLOGY REPORT VIEWER & DETAILS */}
+            {viewingRadiologyOrder && (
+              <ModalPortal isOpen={Boolean(viewingRadiologyOrder)} onClose={() => setViewingRadiologyOrder(null)}>
+                <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+                  <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]">
+                    {/* Header */}
+                    <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70 shrink-0">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
+                          <FileCheck2 className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-base font-bold text-slate-900">
+                              {viewingRadiologyOrder.study_name}
+                            </h3>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800">
+                              {viewingRadiologyOrder.investigation_type}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 font-mono">
+                            Order #{viewingRadiologyOrder.order_number || viewingRadiologyOrder.id?.slice(0, 8)} • {formatDateTime(viewingRadiologyOrder.created_at)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setViewingRadiologyOrder(null)}
+                        className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    {/* Report Content */}
+                    <div className="p-6 space-y-5 overflow-y-auto flex-1">
+                      {/* Clinical Indication Header Block */}
+                      <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <span className="text-slate-400 block text-[11px]">Ordering Physician:</span>
+                          <span className="font-semibold text-slate-800">{viewingRadiologyOrder.doctor_name || 'Attending Doctor'}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block text-[11px]">Priority & Transport:</span>
+                          <span className="font-semibold text-slate-800 uppercase">{viewingRadiologyOrder.priority}</span>
+                          <span className="text-slate-500 capitalize"> ({viewingRadiologyOrder.transport_mode || 'Ambulatory'})</span>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <span className="text-slate-400 block text-[11px]">Clinical Indication:</span>
+                          <span className="text-slate-800 font-medium">{viewingRadiologyOrder.clinical_indication}</span>
+                        </div>
+                        <div className="sm:col-span-2 flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200/80">
+                          <div>
+                            <span className="text-slate-400 block text-[11px]">Tariff / Amount:</span>
+                            <span className="font-bold text-slate-900 text-xs">
+                              {viewingRadiologyOrder.price !== null && viewingRadiologyOrder.price !== undefined
+                                ? `₹${Number(viewingRadiologyOrder.price).toLocaleString('en-IN')}`
+                                : viewingRadiologyOrder.total_amount !== null && viewingRadiologyOrder.total_amount !== undefined
+                                ? `₹${Number(viewingRadiologyOrder.total_amount).toLocaleString('en-IN')}`
+                                : <span className="text-slate-500 italic font-normal">Tariff Not Set</span>}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[11px]">Destination Lab:</span>
+                            <span className="font-semibold text-sky-800 text-xs">
+                              {viewingRadiologyOrder.lab_name || viewingRadiologyOrder.destination_lab?.name || 'Diagnostic Center'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* If Report Finalized */}
+                      {viewingRadiologyOrder.report ? (
+                        <div className="space-y-4">
+                          {/* Finalized Signoff Banner */}
+                          <div className="p-3.5 rounded-xl bg-emerald-50/80 border border-emerald-200 flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                              <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+                              <div>
+                                <h4 className="text-xs font-bold text-emerald-900">Final Diagnostic Report Signed</h4>
+                                <p className="text-[11px] text-emerald-700">
+                                  Verified & finalized by <strong className="font-semibold">{viewingRadiologyOrder.report.uploaded_by?.name || 'Diagnostic Specialist'}</strong>
+                                  {viewingRadiologyOrder.report.finalized_at && ` on ${formatDateTime(viewingRadiologyOrder.report.finalized_at)}`}
+                                </p>
+                              </div>
+                            </div>
+
+                            {viewingRadiologyOrder.report.critical_findings && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                                Critical Finding
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Findings */}
+                          <div>
+                            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                              <span className="w-1.5 h-3.5 bg-sky-600 rounded-full inline-block"></span>
+                              Radiological Findings
+                            </h4>
+                            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 leading-relaxed whitespace-pre-wrap font-sans">
+                              {viewingRadiologyOrder.report.findings}
+                            </div>
+                          </div>
+
+                          {/* Diagnostic Impression */}
+                          <div>
+                            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                              <span className="w-1.5 h-3.5 bg-emerald-600 rounded-full inline-block"></span>
+                              Diagnostic Impression
+                            </h4>
+                            <div className="p-4 rounded-xl bg-emerald-50/40 border border-emerald-200 text-xs text-emerald-950 font-medium leading-relaxed whitespace-pre-wrap">
+                              {viewingRadiologyOrder.report.impression}
+                            </div>
+                          </div>
+
+                          {/* Recommendations */}
+                          {viewingRadiologyOrder.report.recommendations && (
+                            <div>
+                              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-1.5">
+                                Recommendations & Clinical Correlation
+                              </h4>
+                              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 leading-relaxed">
+                                {viewingRadiologyOrder.report.recommendations}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Attached Scan / Document Link */}
+                          {viewingRadiologyOrder.report.file_url && (
+                            <div className="p-3.5 rounded-xl border border-sky-200 bg-sky-50/50 flex items-center justify-between">
+                              <div className="flex items-center gap-2.5">
+                                <FileText className="w-5 h-5 text-sky-600 shrink-0" />
+                                <div>
+                                  <div className="text-xs font-bold text-slate-900">
+                                    {viewingRadiologyOrder.report.file_name || 'Radiology_Scan_Report.pdf'}
+                                  </div>
+                                  <div className="text-[11px] text-slate-500">
+                                    {viewingRadiologyOrder.report.file_size
+                                      ? `${Math.round(viewingRadiologyOrder.report.file_size / 1024)} KB`
+                                      : 'Attached Digital Scan'}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <a
+                                href={viewingRadiologyOrder.report.file_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-3.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                                <span>Open Full Scan</span>
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="p-8 text-center bg-slate-50 rounded-xl border border-slate-200">
+                          <Clock className="w-8 h-8 text-amber-500 mx-auto mb-2 animate-pulse" />
+                          <h4 className="text-xs font-bold text-slate-800">Imaging Report Pending</h4>
+                          <p className="text-[11px] text-slate-500 mt-1 max-w-sm mx-auto">
+                            The investigation is currently in workflow status <strong className="uppercase font-semibold">{viewingRadiologyOrder.status}</strong>. Once diagnostic staff complete imaging and attach the finalized report, findings and impressions will appear here.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Footer */}
+                    <div className="p-4 px-6 border-t border-slate-100 flex justify-end shrink-0 bg-slate-50/50">
+                      <button
+                        type="button"
+                        onClick={() => setViewingRadiologyOrder(null)}
+                        className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </ModalPortal>
+            )}
+
+            {/* MODAL 3: CANCEL RADIOLOGY ORDER */}
+            {cancellingRadiologyOrder && (
+              <ModalPortal isOpen={Boolean(cancellingRadiologyOrder)} onClose={() => setCancellingRadiologyOrder(null)}>
+                <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+                  <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden">
+                    <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-rose-50/50">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center">
+                          <AlertTriangle className="w-5 h-5" />
+                        </div>
+                        <h3 className="text-sm font-bold text-slate-900">Cancel Radiology Order</h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCancellingRadiologyOrder(null)}
+                        className="text-slate-400 hover:text-slate-600 p-1"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="p-5 space-y-3">
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        Are you sure you want to cancel the radiology order for <strong className="text-slate-800">{cancellingRadiologyOrder.study_name}</strong> (#{cancellingRadiologyOrder.order_number})?
+                      </p>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Reason for Cancellation</label>
+                        <input
+                          type="text"
+                          value={radiologyCancelReason}
+                          onChange={e => setRadiologyCancelReason(e.target.value)}
+                          placeholder="e.g. Clinical condition stabilized, alternative imaging chosen..."
+                          className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="p-4 px-5 border-t border-slate-100 flex items-center justify-end gap-2 bg-slate-50/50">
+                      <button
+                        type="button"
+                        onClick={() => setCancellingRadiologyOrder(null)}
+                        className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg"
+                      >
+                        Keep Order
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelRadiologyOrder}
+                        disabled={isRadiologySubmitting}
+                        className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        {isRadiologySubmitting ? 'Cancelling...' : 'Confirm Cancellation'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </ModalPortal>
+            )}
           </div>
         )}
 
@@ -2553,6 +4621,212 @@ export default function InpatientProfilePage() {
           </div>
         )}
       </div>
+
+      {/* ==================== 4. INITIATE TRANSFER MODAL ==================== */}
+      <ModalPortal isOpen={transferModalOpen} onClose={() => setTransferModalOpen(false)}>
+        <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto my-auto animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                  <ArrowRightLeft className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 leading-tight">Initiate Patient Transfer</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Approve and reserve destination bed for {patientName}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTransferModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleInitiateTransfer} className="mt-5 space-y-4">
+              {/* Current Bed Context */}
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-xs">
+                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Current Assignment</span>
+                <p className="font-semibold text-slate-800 mt-0.5">
+                  {wardName}{roomNumberDisplay ? ` • ${roomNumberDisplay}` : ''} • Bed {bedNumber}
+                </p>
+              </div>
+
+              {/* Destination Ward Picker */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Destination Ward <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  id="transfer-destination-ward-select"
+                  value={transferForm.destinationWardId}
+                  onChange={(e) => handleTransferWardChange(e.target.value)}
+                  required
+                  className="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 font-medium"
+                >
+                  <option value="">Select Destination Ward...</option>
+                  {transferWards.map(w => (
+                    <option key={w.id} value={w.id}>
+                      {w.name} ({w.type || 'Ward'}) {w.id === admission?.ward_id ? '• (Current Ward)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Destination Bed Picker */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Destination Bed <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  id="transfer-destination-bed-select"
+                  value={transferForm.destinationBedId}
+                  onChange={(e) => setTransferForm(prev => ({ ...prev, destinationBedId: e.target.value }))}
+                  required
+                  disabled={!transferForm.destinationWardId || transferBedsLoading}
+                  className="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 font-medium disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  <option value="">
+                    {transferBedsLoading
+                      ? 'Loading available beds...'
+                      : !transferForm.destinationWardId
+                      ? 'Select a destination ward first'
+                      : transferBeds.length === 0
+                      ? 'No available beds in this ward'
+                      : 'Select Destination Bed...'}
+                  </option>
+                  {transferBeds.map(b => (
+                    <option key={b.id} value={b.id}>
+                      Bed {b.bed_number || b.bedNumber} {b.room_number ? `(${b.room_number})` : ''} — ₹{b.daily_rate || b.dailyRate || 0}/day
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Clinical Reason */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Clinical Reason / Indication
+                </label>
+                <input
+                  type="text"
+                  id="transfer-reason-input"
+                  value={transferForm.reason}
+                  onChange={(e) => setTransferForm(prev => ({ ...prev, reason: e.target.value }))}
+                  placeholder="e.g. Clinical improvement, step-down care, isolation, or patient request"
+                  className="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Clinical Handover Notes */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Special Instructions / Handover Notes
+                </label>
+                <textarea
+                  rows={3}
+                  id="transfer-clinical-notes-input"
+                  value={transferForm.clinicalNotes}
+                  onChange={(e) => setTransferForm(prev => ({ ...prev, clinicalNotes: e.target.value }))}
+                  placeholder="Instructions for receiving ward, transport equipment needed (oxygen, wheelchair), etc."
+                  className="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {transferError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-xs text-rose-800 rounded-lg flex items-center gap-2 font-medium">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{transferError}</span>
+                </div>
+              )}
+
+              <div className="pt-2 flex items-center justify-end gap-2.5 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setTransferModalOpen(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  id="submit-doctor-transfer-btn"
+                  disabled={transferSubmitting || !transferForm.destinationBedId}
+                  className="inline-flex items-center gap-2 px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg shadow-sm transition-colors cursor-pointer"
+                >
+                  <ArrowRightLeft className="w-3.5 h-3.5" />
+                  {transferSubmitting ? 'Approving Transfer...' : 'Approve & Reserve Bed'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </ModalPortal>
+
+      {/* ==================== 5. CANCEL TRANSFER MODAL ==================== */}
+      <ModalPortal isOpen={cancelModalOpen} onClose={() => setCancelModalOpen(false)}>
+        <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto my-auto animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
+              <div className="p-2 bg-rose-50 text-rose-600 rounded-xl">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 leading-tight">Cancel Transfer Request</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Release reserved destination bed back to available inventory
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Are you sure you want to cancel the transfer to{' '}
+                <strong>{admission?.pendingTransfer?.destinationWardName} (Bed {admission?.pendingTransfer?.destinationBedNumber})</strong>?
+                The reserved bed will immediately become AVAILABLE for other patients.
+              </p>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Reason for Cancellation
+                </label>
+                <input
+                  type="text"
+                  id="cancel-transfer-reason-input"
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="e.g. Clinical condition changed, patient declined"
+                  className="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-rose-500"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-2.5 border-t border-slate-100 pt-3">
+              <button
+                type="button"
+                onClick={() => setCancelModalOpen(false)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                Keep Transfer
+              </button>
+              <button
+                type="button"
+                id="confirm-cancel-transfer-btn"
+                onClick={handleCancelTransfer}
+                disabled={cancellingTransfer}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 rounded-lg shadow-sm transition-colors cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+                {cancellingTransfer ? 'Cancelling...' : 'Confirm Cancellation'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </ModalPortal>
     </div>
   );
 }

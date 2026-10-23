@@ -49,7 +49,7 @@ export function useModalScrollLock(isOpen, onClose) {
   }, [isOpen, onClose]);
 }
 
-export default function ModalPortal({ children, isOpen, onClose }) {
+export default function ModalPortal({ children, isOpen = true, onClose }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {

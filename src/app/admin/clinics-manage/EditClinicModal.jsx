@@ -25,7 +25,8 @@ import {
   AlertCircle,
   ExternalLink,
   Save,
-  Check
+  Check,
+  Layers
 } from 'lucide-react';
 
 const CLINIC_TYPES = [
@@ -165,7 +166,9 @@ export default function EditClinicModal({ isOpen, onClose, clinic, onClinicUpdat
     gstDocumentUrl: clinic.gst_document_url || clinic.gstDocumentUrl || clinic.gst_document || clinic.gstDocument || '',
     specialties: initialSpecialties,
     is24x7: Boolean(clinic.is_24x7 ?? clinic.is24x7),
-    openingHours: parseHours(clinic.opening_hours || clinic.openingHours)
+    openingHours: parseHours(clinic.opening_hours || clinic.openingHours),
+    enableLab: clinic.modules ? clinic.modules.lab !== false : true,
+    enableIpd: clinic.modules ? clinic.modules.ipd === true : false
   });
 
   const [customSpecialty, setCustomSpecialty] = useState('');
@@ -219,7 +222,9 @@ export default function EditClinicModal({ isOpen, onClose, clinic, onClinicUpdat
         gstDocumentUrl: clinic.gst_document_url || clinic.gstDocumentUrl || clinic.gst_document || clinic.gstDocument || '',
         specialties: specs,
         is24x7: Boolean(clinic.is_24x7 ?? clinic.is24x7),
-        openingHours: parseHours(clinic.opening_hours || clinic.openingHours)
+        openingHours: parseHours(clinic.opening_hours || clinic.openingHours),
+        enableLab: clinic.modules ? clinic.modules.lab !== false : true,
+        enableIpd: clinic.modules ? clinic.modules.ipd === true : false
       });
       setLogoFile(null);
       setLogoPreview(clinic.logo || clinic.logo_url || clinic.logoUrl || null);
@@ -587,7 +592,11 @@ export default function EditClinicModal({ isOpen, onClose, clinic, onClinicUpdat
         licenseDocumentUrl: uploadedLicenseUrl,
         license_document_url: uploadedLicenseUrl,
         gstDocumentUrl: uploadedGstUrl,
-        gst_document_url: uploadedGstUrl
+        gst_document_url: uploadedGstUrl,
+        modules: {
+          lab: Boolean(formData.enableLab),
+          ipd: Boolean(formData.enableIpd)
+        }
       };
 
       // 4. Call clinic update API
@@ -633,8 +642,14 @@ export default function EditClinicModal({ isOpen, onClose, clinic, onClinicUpdat
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[680px] max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-[680px] max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 cursor-default"
+      >
         {/* Modal Header */}
         <div className="flex-shrink-0 flex justify-between items-center px-6 py-4 bg-white border-b border-gray-200 z-10">
           <div className="flex items-center space-x-2.5">
@@ -1206,6 +1221,49 @@ export default function EditClinicModal({ isOpen, onClose, clinic, onClinicUpdat
                   })}
                 </div>
               )}
+            </div>
+
+            {/* 7. Module Configuration */}
+            <div className="bg-white p-5 rounded-xl border border-gray-200/80 shadow-sm space-y-4" data-field="modules">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-blue-600" />
+                  Module Configuration
+                </h3>
+                <span className="text-xs text-gray-500 font-medium">Clinic Feature Access</span>
+              </div>
+              <p className="text-xs text-gray-600">
+                Configure which specialized clinical modules are enabled for this clinic.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <label className="flex items-start gap-3 p-3.5 rounded-lg border border-gray-200 bg-white hover:border-blue-300 transition-colors cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="enableLab"
+                    checked={formData.enableLab}
+                    onChange={(e) => setFormData(prev => ({ ...prev, enableLab: e.target.checked }))}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div>
+                    <span className="text-xs font-semibold text-gray-800 block">Enable Lab Module</span>
+                    <span className="text-[11px] text-gray-500">Enable laboratory test ordering, reports, and lab tracking</span>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-3 p-3.5 rounded-lg border border-gray-200 bg-white hover:border-blue-300 transition-colors cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="enableIpd"
+                    checked={formData.enableIpd}
+                    onChange={(e) => setFormData(prev => ({ ...prev, enableIpd: e.target.checked }))}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div>
+                    <span className="text-xs font-semibold text-gray-800 block">Enable IPD &amp; Bed Management</span>
+                    <span className="text-[11px] text-gray-500">Enable inpatient admissions, bed management, and nurse allocation</span>
+                  </div>
+                </label>
+              </div>
             </div>
           </form>
         </div>

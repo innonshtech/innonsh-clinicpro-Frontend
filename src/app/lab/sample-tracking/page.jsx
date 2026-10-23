@@ -520,8 +520,14 @@ export default function SampleTrackingPage() {
       {/* View Sample Details Modal */}
       {viewingSample && (
         <ModalPortal isOpen={Boolean(viewingSample)} onClose={() => setViewingSample(null)}>
-          <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6">
-          <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden p-6 space-y-4 max-h-[88vh] overflow-y-auto flex flex-col my-auto animate-in zoom-in-95 duration-200">
+          <div 
+            onClick={() => setViewingSample(null)}
+            className="fixed inset-0 z-[100] overflow-y-auto bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6"
+          >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden p-6 space-y-4 max-h-[88vh] overflow-y-auto flex flex-col my-auto animate-in zoom-in-95 duration-200"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <QrCode className="w-5 h-5 text-teal-600" />
@@ -652,8 +658,14 @@ export default function SampleTrackingPage() {
       {/* Reject Specimen Modal */}
       {rejectingSample && (
         <ModalPortal isOpen={Boolean(rejectingSample)} onClose={() => setRejectingSample(null)}>
-          <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6">
-            <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden p-6 space-y-4 max-h-[88vh] overflow-y-auto flex flex-col my-auto animate-in zoom-in-95 duration-200">
+          <div 
+            onClick={() => setRejectingSample(null)}
+            className="fixed inset-0 z-[100] overflow-y-auto bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6"
+          >
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden p-6 space-y-4 max-h-[88vh] overflow-y-auto flex flex-col my-auto animate-in zoom-in-95 duration-200"
+            >
               <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto shrink-0">
                 <AlertTriangle className="w-6 h-6" />
               </div>

@@ -9,6 +9,14 @@ import { patientService } from '@/utils/patientService';
 import { appointmentService } from '@/utils/appointmentService';
 import { doctorService } from '@/utils/doctorService';
 
+const getTodayLocalDate = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export default function AddPatientPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -23,7 +31,6 @@ export default function AddPatientPage() {
     bloodGroup: '',
     phoneNumber: '',
     email: '',
-    password: '',
     address: '',
     city: '',
     state: '',
@@ -34,7 +41,7 @@ export default function AddPatientPage() {
     symptoms: '',
     // Appointment fields
     doctorId: '',
-    appointmentDate: '',
+    appointmentDate: getTodayLocalDate(),
     timeSlot: '',
   });
 
@@ -81,9 +88,10 @@ export default function AddPatientPage() {
       const result = await patientService.registerPatient(formData, token);
       
       // If registration is successful, book the mandatory appointment
-      if (result.success && result.data.patient._id) {
+      const patientId = result?.data?.patient?._id || result?.data?.patient?.id;
+      if (result.success && patientId) {
         const appointmentData = {
-          patientId: result.data.patient._id,
+          patientId: patientId,
           doctorId: formData.doctorId,
           appointmentDate: formData.appointmentDate,
           timeSlot: formData.timeSlot,
@@ -138,7 +146,7 @@ export default function AddPatientPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-6">
+        <form onSubmit={handleSubmit} className="mt-6 space-y-6" autoComplete="off">
           {/* Personal Information */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden transition-all duration-200 hover:shadow-md">
             <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
@@ -296,6 +304,7 @@ export default function AddPatientPage() {
                       value={formData.email}
                       onChange={handleChange}
                       required
+                      autoComplete="off"
                       className="w-full px-4 py-2.5 pl-12 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-blue-300 bg-white"
                       placeholder="patient@example.com"
                     />
@@ -364,26 +373,6 @@ export default function AddPatientPage() {
                     className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-blue-300 bg-white"
                     placeholder="12345"
                   />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Password <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="password"
-                      name="password"
-                      value={formData.password}
-                      onChange={handleChange}
-                      required
-                      className="w-full px-4 py-2.5 pl-12 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-blue-300 bg-white"
-                      placeholder="Create a password"
-                    />
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Lock className="h-5 w-5 text-blue-400" />
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
@@ -505,7 +494,7 @@ export default function AddPatientPage() {
                     value={formData.appointmentDate}
                     onChange={handleChange}
                     required
-                    min={new Date().toISOString().split('T')[0]}
+                    min={getTodayLocalDate()}
                     className="w-full px-4 py-2.5 border border-blue-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-blue-50/50"
                   />
                 </div>

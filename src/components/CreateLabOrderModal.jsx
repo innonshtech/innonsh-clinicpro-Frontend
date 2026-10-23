@@ -15,8 +15,38 @@ import {
   User,
   Trash2,
   CheckCircle2,
-  ShieldAlert
+  ShieldAlert,
+  Radio
 } from 'lucide-react';
+
+const OPD_RADIOLOGY_PRESETS = {
+  'X-Ray': [
+    { name: 'Chest X-Ray PA View', price: 600 },
+    { name: 'Chest AP (Bedside Portable)', price: 750 },
+    { name: 'Abdomen Erect & Supine', price: 800 },
+    { name: 'Left Knee AP/Lateral', price: 600 },
+    { name: 'Right Knee AP/Lateral', price: 600 },
+    { name: 'Lumbar Spine AP/Lateral', price: 700 }
+  ],
+  'CT Scan': [
+    { name: 'HRCT Chest Non-Contrast', price: 3500 },
+    { name: 'NCCT Head / Brain', price: 2800 },
+    { name: 'CECT Whole Abdomen', price: 5000 },
+    { name: 'CT Cervical Spine', price: 3200 }
+  ],
+  'Ultrasound': [
+    { name: 'USG Whole Abdomen & Pelvis', price: 1500 },
+    { name: 'USG KUB (Kidney, Ureter, Bladder)', price: 1200 },
+    { name: 'USG Thyroid / Neck', price: 1400 },
+    { name: 'Venous Doppler Lower Limb', price: 2500 }
+  ],
+  'MRI': [
+    { name: 'MRI Brain Non-Contrast', price: 6000 },
+    { name: 'MRI Lumbar Spine', price: 6500 },
+    { name: 'MRI Cervical Spine', price: 6500 },
+    { name: 'MRI Knee Joint', price: 5500 }
+  ]
+};
 
 export default function CreateLabOrderModal({
   isOpen,
@@ -31,10 +61,17 @@ export default function CreateLabOrderModal({
 
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [labCatalog, setLabCatalog] = useState({ tests: [], packages: [] });
-  const [serviceTab, setServiceTab] = useState('tests'); // 'tests' | 'packages'
+  const [serviceTab, setServiceTab] = useState('tests'); // 'tests' | 'packages' | 'radiology'
   const [serviceSearch, setServiceSearch] = useState('');
   const [selectedItems, setSelectedItems] = useState([]);
   const [priority, setPriority] = useState('routine');
+
+  // Radiology specific inputs
+  const [radModality, setRadModality] = useState('X-Ray');
+  const [radStudyName, setRadStudyName] = useState('');
+  const [radIndication, setRadIndication] = useState('');
+  const [radInstructions, setRadInstructions] = useState('');
+  const [radPrice, setRadPrice] = useState('600');
 
   const [clinicalNotes, setClinicalNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -180,6 +217,37 @@ export default function CreateLabOrderModal({
     }
   };
 
+  const handleAddRadiologyItem = (e) => {
+    e?.preventDefault();
+    if (!radStudyName.trim()) {
+      toast.error('Please specify a radiology study/protocol name');
+      return;
+    }
+    if (!radIndication.trim() || radIndication.trim().length < 3) {
+      toast.error('Clinical indication is mandatory for radiology (minimum 3 characters)');
+      return;
+    }
+    setSelectedItems((prev) => [
+      ...prev,
+      {
+        item_type: 'radiology',
+        test_id: null,
+        package_id: null,
+        modality: radModality,
+        study_name: radStudyName.trim(),
+        item_name: `${radModality}: ${radStudyName.trim()}`,
+        item_code: radModality.toUpperCase().replace(/\s+/g, '-'),
+        clinical_indication: radIndication.trim(),
+        instructions: radInstructions.trim() || undefined,
+        price: Number(radPrice) || 0
+      }
+    ]);
+    setRadStudyName('');
+    setRadIndication('');
+    setRadInstructions('');
+    toast.success(`${radModality} investigation added`);
+  };
+
   const handleRemoveItem = (index) => {
     setSelectedItems((prev) => prev.filter((_, idx) => idx !== index));
   };
@@ -200,9 +268,38 @@ export default function CreateLabOrderModal({
       setFormError('Please select a destination laboratory.');
       return;
     }
-    if (selectedItems.length === 0) {
-      setFormError('Please select at least one diagnostic test or package.');
+    let currentSelectedItems = [...selectedItems];
+    if (currentSelectedItems.length === 0 && serviceTab === 'radiology' && radStudyName.trim()) {
+      if (!radIndication.trim() || radIndication.trim().length < 3) {
+        setFormError('Clinical indication is mandatory for radiology (minimum 3 characters).');
+        return;
+      }
+      currentSelectedItems.push({
+        item_type: 'radiology',
+        test_id: null,
+        package_id: null,
+        modality: radModality,
+        study_name: radStudyName.trim(),
+        item_name: `${radModality}: ${radStudyName.trim()}`,
+        item_code: radModality.toUpperCase().replace(/\s+/g, '-'),
+        clinical_indication: radIndication.trim(),
+        instructions: radInstructions.trim() || undefined,
+        price: Number(radPrice) || 0
+      });
+      setSelectedItems(currentSelectedItems);
+    }
+
+    if (currentSelectedItems.length === 0) {
+      setFormError('Please select at least one diagnostic test, package, or radiology study.');
       return;
+    }
+
+    // Validate radiology items clinical indication
+    for (const item of currentSelectedItems) {
+      if (item.item_type === 'radiology' && (!item.clinical_indication || item.clinical_indication.trim().length < 3)) {
+        setFormError('A clinical indication (minimum 3 characters) is required for each radiology investigation.');
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -213,10 +310,15 @@ export default function CreateLabOrderModal({
       lab_id: selectedLabId,
       priority,
       clinical_notes: clinicalNotes.trim() || null,
-      items: selectedItems.map((i) => ({
+      items: currentSelectedItems.map((i) => ({
         item_type: i.item_type,
         test_id: i.test_id || undefined,
-        package_id: i.package_id || undefined
+        package_id: i.package_id || undefined,
+        modality: i.modality || undefined,
+        study_name: i.study_name || undefined,
+        clinical_indication: i.clinical_indication || undefined,
+        instructions: i.instructions || undefined,
+        price: i.price !== undefined ? Number(i.price) : undefined
       }))
     };
 
@@ -378,6 +480,17 @@ export default function CreateLabOrderModal({
                   >
                     Packages ({labCatalog.packages?.length || 0})
                   </button>
+                  <button
+                    type="button"
+                    id="tab-inpatient-radiology"
+                    onClick={() => setServiceTab('radiology')}
+                    className={`px-3 py-1 rounded-md font-semibold transition-colors flex items-center gap-1.5 ${
+                      serviceTab === 'radiology' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600'
+                    }`}
+                  >
+                    <Radio className="w-3.5 h-3.5 text-indigo-600" />
+                    Radiology / Imaging
+                  </button>
                 </div>
               )}
             </div>
@@ -385,8 +498,138 @@ export default function CreateLabOrderModal({
             {!selectedLabId ? (
               <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl text-center">
                 <p className="text-xs text-slate-500">
-                  Select a destination laboratory above to view available tests and packages.
+                  Select a destination laboratory above to view available tests, packages, or configure radiology requisitions.
                 </p>
+              </div>
+            ) : serviceTab === 'radiology' ? (
+              <div className="p-4 bg-indigo-50/50 border border-indigo-200/80 rounded-xl space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-indigo-100">
+                  <span className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+                    <Radio className="w-4 h-4 text-indigo-600" />
+                    Diagnostic Imaging & Radiology Study Configuration
+                  </span>
+                  <span className="text-[11px] text-indigo-600 font-medium">Destination: Selected Laboratory</span>
+                </div>
+
+                {/* Modality Selector */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                    Select Imaging Modality
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {['X-Ray', 'CT Scan', 'Ultrasound', 'MRI'].map((mod) => (
+                      <button
+                        key={mod}
+                        type="button"
+                        onClick={() => {
+                          setRadModality(mod);
+                          const firstPreset = OPD_RADIOLOGY_PRESETS[mod]?.[0];
+                          if (firstPreset) {
+                            setRadStudyName(firstPreset.name);
+                            setRadPrice(String(firstPreset.price));
+                          }
+                        }}
+                        className={`py-1.5 px-3 rounded-lg text-xs font-semibold border transition-all ${
+                          radModality === mod
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        {mod}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Study Presets */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                    Quick Study / Protocol Presets ({radModality})
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(OPD_RADIOLOGY_PRESETS[radModality] || []).map((preset, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setRadStudyName(preset.name);
+                          setRadPrice(String(preset.price));
+                        }}
+                        className={`px-2 py-1 rounded text-[11px] border transition-colors ${
+                          radStudyName === preset.name
+                            ? 'bg-indigo-100 border-indigo-300 text-indigo-900 font-semibold'
+                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {preset.name} (₹{preset.price})
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Study / Protocol Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Chest X-Ray PA View, NCCT Head..."
+                      value={radStudyName}
+                      onChange={(e) => setRadStudyName(e.target.value)}
+                      className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Estimated Tariff (₹)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={radPrice}
+                      onChange={(e) => setRadPrice(e.target.value)}
+                      className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-600"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                    Clinical Indication <span className="text-red-500">* (Mandatory)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Evaluate persistent dyspnea, rule out focal consolidation or trauma"
+                    value={radIndication}
+                    onChange={(e) => setRadIndication(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                    Special Imaging Instructions <span className="text-slate-400 font-normal">(Optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Lead shielding required, patient on stretcher, erect exposure"
+                    value={radInstructions}
+                    onChange={(e) => setRadInstructions(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-600"
+                  />
+                </div>
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={handleAddRadiologyItem}
+                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add {radModality} to Requisition</span>
+                  </button>
+                </div>
               </div>
             ) : (
               <>

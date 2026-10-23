@@ -92,6 +92,17 @@ useEffect(()=>{
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    if (name === 'phone') {
+      const cleanDigits = value.replace(/\D/g, '').slice(0, 10);
+      setFormData(prev => ({
+        ...prev,
+        [name]: cleanDigits
+      }));
+      if (errors.phone) {
+        setErrors(prev => ({ ...prev, phone: '' }));
+      }
+      return;
+    }
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -179,10 +190,13 @@ useEffect(()=>{
       newErrors.country = 'Country is required';
     }
     
-    if (!formData.phone.trim()) {
+    const cleanPhone = (formData.phone || '').toString().replace(/\D/g, '');
+    if (!cleanPhone) {
       newErrors.phone = 'Phone number is required';
-    } else if (!/^[\d\s\+\-\(\)]{10,15}$/.test(formData.phone)) {
-      newErrors.phone = 'Invalid phone number format';
+    } else if (cleanPhone.length !== 10) {
+      newErrors.phone = 'Phone number must be exactly 10 digits';
+    } else if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+      newErrors.phone = 'Please enter a valid 10-digit Indian phone number starting with 6, 7, 8, or 9';
     }
     
     if (!formData.email.trim()) {
@@ -467,12 +481,13 @@ useEffect(()=>{
                   type="tel"
                   id="phone"
                   name="phone"
-                  value={formData.phone}
+                  value={formData.phone || ''}
                   onChange={handleChange}
+                  maxLength={10}
                   className={`w-full px-4 py-3 bg-white border-2 rounded-xl transition-all duration-300 focus:ring-4 focus:ring-green-100 focus:border-green-500 hover:border-green-300 ${
                     errors.phone ? 'border-red-500' : 'border-gray-200'
                   }`}
-                  placeholder="+1 (555) 123-4567"
+                  placeholder="10-digit mobile number (e.g. 9876543210)"
                 />
                 {errors.phone && (
                   <p className="mt-2 text-sm text-red-600 animate-shake">{errors.phone}</p>

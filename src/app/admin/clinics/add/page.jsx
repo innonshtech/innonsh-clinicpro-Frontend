@@ -538,6 +538,10 @@ export default function AddClinicPage() {
         postalCode: formData.postalCode.trim(),
         country: formData.country.trim(),
         specialties: formData.specialties,
+        modules: {
+          lab: Boolean(formData.enableLab),
+          ipd: Boolean(formData.enableIpd)
+        },
         status: 'active',
         approved: true,
         isNewlyCreated: true,

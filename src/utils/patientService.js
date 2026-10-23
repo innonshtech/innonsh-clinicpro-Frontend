@@ -17,6 +17,8 @@ export const patientService = {
       ...(params.phoneNumber && { phoneNumber: params.phoneNumber }),
       ...(params.startDate && { startDate: params.startDate }),
       ...(params.endDate && { endDate: params.endDate }),
+      ...(params.sortBy && { sortBy: params.sortBy }),
+      ...(params.sortOrder && { sortOrder: params.sortOrder }),
     }).toString();
 
     const response = await fetch(`${API_BASE_URL}/api/v1/patient/list?${query}`, {

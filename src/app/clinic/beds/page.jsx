@@ -2030,8 +2030,14 @@ export default function BedManagementPage() {
 
       {/* 5. BED DETAILS & AUDIT HISTORY MODAL */}
       {selectedBed && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-20 pb-10 bg-slate-900/40 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-xl flex flex-col max-h-[calc(100vh-7.5rem)] text-xs overflow-hidden">
+        <div 
+          onClick={() => { setSelectedBed(null); setBedDetails(null); }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-20 pb-10 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-xl flex flex-col max-h-[calc(100vh-7.5rem)] text-xs overflow-hidden"
+          >
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70 shrink-0">
               <span className="font-bold text-sm text-slate-900">Bed {selectedBed.bed_number} Details &amp; History</span>
               <button
@@ -2238,8 +2244,14 @@ export default function BedManagementPage() {
 
       {/* 6. ENTITY CREATION MODAL */}
       {modalType && (
-        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-xl text-xs overflow-hidden flex flex-col max-h-[92vh]">
+        <div 
+          onClick={() => { setModalType(null); setEditingEntity(null); }}
+          className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-xl text-xs overflow-hidden flex flex-col max-h-[92vh]"
+          >
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70 shrink-0">
               <span className="font-bold text-sm text-slate-900 capitalize">{modalMode === 'edit' ? `Edit ${modalType}` : `Create ${modalType}`}</span>
               <button
@@ -2572,8 +2584,14 @@ export default function BedManagementPage() {
       )}
       {/* 6. CONFIRMATION MODAL FOR DELETE VS DEACTIVATE */}
       {actionConfirm && actionConfirm.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 space-y-4">
+        <div 
+          onClick={() => setActionConfirm(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 space-y-4"
+          >
             {actionConfirm.actionType === 'delete' && actionConfirm.hasReferences ? (
               /* Case 1: Cannot delete referenced entity -> Explain why and offer Deactivate */
               <div className="space-y-3">

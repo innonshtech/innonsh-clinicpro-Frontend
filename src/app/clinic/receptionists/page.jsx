@@ -1,27 +1,56 @@
 'use client';
-import { API_BASE_URL } from '@/utils/api';
-import { useState, useEffect } from 'react';
-import { FiSearch, FiUserPlus, FiEdit2, FiTrash2, FiChevronLeft, FiChevronRight, FiX, FiEye, FiEyeOff, FiAlertCircle, FiRefreshCw, FiCheckCircle, FiXCircle } from 'react-icons/fi';
-import { MdOutlineVerified, MdOutlinePending } from 'react-icons/md';
 
-const ReceptionistManagement = () => {
+import { useState, useEffect } from 'react';
+import { API_BASE_URL } from '@/utils/api';
+import {
+  Users,
+  UserPlus,
+  Search,
+  Edit2,
+  Trash2,
+  X,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  RefreshCw,
+  CheckCircle2,
+  Phone,
+  Mail,
+  Shield,
+  Check,
+  ChevronLeft,
+  ChevronRight
+} from 'lucide-react';
+
+const initialFormState = {
+  firstName: '',
+  lastName: '',
+  email: '',
+  phone: '',
+  password: '',
+  newPassword: '',
+  status: 'active'
+};
+
+export default function ReceptionistManagement() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentReceptionist, setCurrentReceptionist] = useState(null);
+  const [formData, setFormData] = useState(initialFormState);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [receptionists, setReceptionists] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [modalError, setModalError] = useState('');
   const [submitLoading, setSubmitLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [receptionistToDelete, setReceptionistToDelete] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
-  const [Id, setId] = useState('');
+  const [clinicId, setClinicId] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
+  const itemsPerPage = 6;
 
   useEffect(() => {
     const user = localStorage.getItem('user');
@@ -33,11 +62,11 @@ const ReceptionistManagement = () => {
 
     try {
       const userdata = JSON.parse(user);
-      const id = userdata?.id;
+      const id = userdata?.id || userdata?.clinicId || userdata?._id;
       if (!id) {
         throw new Error('Invalid user data');
       }
-      setId(id);
+      setClinicId(id);
       fetchReceptionists(id);
     } catch (err) {
       console.error('Error parsing user data:', err);
@@ -52,7 +81,7 @@ const ReceptionistManagement = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/api/v1/clinic/fetch-receptionist/${id}`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       const responseData = await response.json();
 
@@ -74,15 +103,18 @@ const ReceptionistManagement = () => {
     }
   };
 
-  const filteredReceptionists = receptionists.filter(receptionist => {
-    const matchesSearch = `${receptionist.firstName || ''} ${receptionist.lastName || ''}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (receptionist.email || '').toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredReceptionists = receptionists.filter((receptionist) => {
+    const nameMatch = `${receptionist.firstName || ''} ${receptionist.lastName || ''}`
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase());
+    const emailMatch = (receptionist.email || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const phoneMatch = (receptionist.phone || '').includes(searchTerm);
+    const matchesSearch = nameMatch || emailMatch || phoneMatch;
     const matchesFilter = activeFilter === 'all' || receptionist.status === activeFilter;
     return matchesSearch && matchesFilter;
   });
 
-  // Pagination logic
-  const totalPages = Math.ceil(filteredReceptionists.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredReceptionists.length / itemsPerPage) || 1;
   const paginatedReceptionists = filteredReceptionists.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
@@ -90,20 +122,34 @@ const ReceptionistManagement = () => {
 
   const openAddModal = () => {
     setCurrentReceptionist(null);
-    setIsModalOpen(true);
+    setFormData({ ...initialFormState });
     setShowPassword(false);
-    setShowConfirmPassword(false);
-    setError('');
-    setSuccessMessage('');
+    setModalError('');
+    setIsModalOpen(true);
   };
 
   const openEditModal = (receptionist) => {
     setCurrentReceptionist(receptionist);
-    setIsModalOpen(true);
+    setFormData({
+      firstName: receptionist.firstName || '',
+      lastName: receptionist.lastName || '',
+      email: receptionist.email || '',
+      phone: receptionist.phone || '',
+      password: '',
+      newPassword: '',
+      status: receptionist.status || 'active'
+    });
     setShowPassword(false);
-    setShowConfirmPassword(false);
-    setError('');
-    setSuccessMessage('');
+    setModalError('');
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    if (submitLoading) return;
+    setIsModalOpen(false);
+    setCurrentReceptionist(null);
+    setFormData({ ...initialFormState });
+    setModalError('');
   };
 
   const handleDeleteClick = (id) => {
@@ -120,7 +166,7 @@ const ReceptionistManagement = () => {
       const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/api/v1/clinic/delete-receptionist/${id}`, {
         method: 'DELETE',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
 
       const responseData = await response.json();
@@ -129,7 +175,7 @@ const ReceptionistManagement = () => {
         throw new Error(responseData.message || 'Failed to delete receptionist');
       }
 
-      setReceptionists(prev => prev.filter(r => r._id !== id));
+      setReceptionists((prev) => prev.filter((r) => (r._id || r.id) !== id));
       setSuccessMessage('Receptionist deleted successfully');
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
@@ -145,83 +191,77 @@ const ReceptionistManagement = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitLoading(true);
-    setError('');
-    setSuccessMessage('');
+    setModalError('');
 
-    const formData = new FormData(e.target);
-    const data = {
-      firstName: formData.get('firstName')?.trim(),
-      lastName: formData.get('lastName')?.trim(),
-      email: formData.get('email')?.trim(),
-      phone: formData.get('phone')?.trim(),
-      status: formData.get('status'),
-      clinicId: Id,
+    const resolvedEmail = (formData.email || currentReceptionist?.email || '').trim();
+    const cleanPhone = (formData.phone || '').trim();
+
+    const payload = {
+      firstName: (formData.firstName || '').trim(),
+      lastName: (formData.lastName || '').trim(),
+      email: resolvedEmail,
+      phone: cleanPhone,
+      status: formData.status || 'active',
+      clinicId: clinicId
     };
 
-    // Validation
-    if (!data.firstName || !data.lastName || !data.email || !data.phone) {
-      setError('All required fields must be filled');
+    // Form Validation
+    if (!payload.firstName || !payload.lastName || !payload.email || !payload.phone) {
+      setModalError('All required fields must be filled');
       setSubmitLoading(false);
       return;
     }
 
-    if (!/^\S+@\S+\.\S+$/.test(data.email)) {
-      setError('Please enter a valid email address');
+    if (!/^\S+@\S+\.\S+$/.test(payload.email)) {
+      setModalError('Please enter a valid email address');
       setSubmitLoading(false);
       return;
     }
 
-    // Handle password for new receptionists
+    if (cleanPhone.length !== 10) {
+      setModalError('Phone number must be exactly 10 digits');
+      setSubmitLoading(false);
+      return;
+    }
+
     if (!currentReceptionist) {
-      const password = formData.get('password');
-      const confirmPassword = formData.get('confirmPassword');
-      
-      if (!password || password.length < 8) {
-        setError('Password must be at least 8 characters long');
+      if (!formData.password || formData.password.length < 8) {
+        setModalError('Password must be at least 8 characters long');
         setSubmitLoading(false);
         return;
       }
-
-      if (password !== confirmPassword) {
-        setError('Passwords do not match');
-        setSubmitLoading(false);
-        return;
-      }
-      data.password = password;
+      payload.password = formData.password;
     } else {
-      // Handle password change for existing receptionists
-      const newPassword = formData.get('newPassword');
-      if (newPassword && newPassword.length > 0) {
-        if (newPassword.length < 8) {
-          setError('New password must be at least 8 characters long');
+      if (formData.newPassword && formData.newPassword.length > 0) {
+        if (formData.newPassword.length < 8) {
+          setModalError('New password must be at least 8 characters long');
           setSubmitLoading(false);
           return;
         }
-        data.password = newPassword;
+        payload.password = formData.newPassword;
       }
     }
 
     try {
       let response;
+      const token = localStorage.getItem('token');
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      };
+
       if (currentReceptionist) {
-        // Update existing receptionist
-        response = await fetch(`${API_BASE_URL}/api/v1/clinic/update-receptionist/${currentReceptionist._id}`, {
+        const rId = currentReceptionist._id || currentReceptionist.id;
+        response = await fetch(`${API_BASE_URL}/api/v1/clinic/update-receptionist/${rId}`, {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          body: JSON.stringify(data),
+          headers,
+          body: JSON.stringify(payload)
         });
       } else {
-        // Create new receptionist
         response = await fetch(`${API_BASE_URL}/api/v1/clinic/add-receptionist`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          body: JSON.stringify(data),
+          headers,
+          body: JSON.stringify(payload)
         });
       }
 
@@ -231,497 +271,490 @@ const ReceptionistManagement = () => {
         throw new Error(responseData.message || 'Failed to save receptionist');
       }
 
-      const savedReceptionist = responseData.data.staff || responseData.data.receptionist;
+      const savedReceptionist = responseData.data?.staff || responseData.data?.receptionist || responseData.data;
 
       if (currentReceptionist) {
-        setReceptionists(prev => 
-          prev.map(r => r._id === currentReceptionist._id ? savedReceptionist : r)
+        const curId = currentReceptionist._id || currentReceptionist.id;
+        setReceptionists((prev) =>
+          prev.map((r) => ((r._id || r.id) === curId ? { ...r, ...savedReceptionist } : r))
         );
         setSuccessMessage('Receptionist updated successfully');
       } else {
-        setReceptionists(prev => [...prev, savedReceptionist]);
+        setReceptionists((prev) => [...prev, savedReceptionist]);
         setSuccessMessage('Receptionist created successfully');
       }
 
-      setTimeout(() => {
-        setIsModalOpen(false);
-        setSuccessMessage('');
-      }, 1500);
+      closeModal();
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       console.error('Error saving receptionist:', err);
-      setError(err.message || 'An error occurred while saving. Please try again.');
+      setModalError(err.message || 'An error occurred while saving. Please try again.');
     } finally {
       setSubmitLoading(false);
     }
   };
 
-  // Clear messages after timeout
-  useEffect(() => {
-    if (error || successMessage) {
-      const timer = setTimeout(() => {
-        setError('');
-        setSuccessMessage('');
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [error, successMessage]);
-
   return (
-    <div className="max-w-7xl mx-auto">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+      {/* 1. Header Section — Matches Bed & Ward Management & Lab Orders */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">Receptionist Management</h1>
-          <p className="text-slate-500 mt-1 text-sm">Manage your clinic's receptionists</p>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Receptionist Management</h1>
+          <p className="text-slate-500 text-sm mt-0.5">Manage front desk staff, credentials, and access statuses</p>
         </div>
         <button
           onClick={openAddModal}
-          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors w-full md:w-auto justify-center"
+          className="inline-flex items-center justify-center px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-sm gap-2 shrink-0 self-start sm:self-auto"
         >
-          <FiUserPlus size={18} />
-          Add New Receptionist
+          <UserPlus className="w-4 h-4" />
+          <span>Add New Receptionist</span>
         </button>
       </div>
 
-      {/* Status Messages */}
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-start gap-2">
-          <FiAlertCircle className="flex-shrink-0 mt-0.5" />
-          <span>{error}</span>
-        </div>
-      )}
+      {/* Notifications */}
       {successMessage && (
-        <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg flex items-start gap-2">
-          <FiCheckCircle className="flex-shrink-0 mt-0.5" />
+        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-sm animate-in fade-in duration-200">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0" />
           <span>{successMessage}</span>
         </div>
       )}
 
-      {/* Search and Filter Bar */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="relative flex-1 max-w-2xl">
-          <FiSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 h-5 w-5" />
+      {error && (
+        <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-sm animate-in fade-in duration-200">
+          <AlertCircle className="h-4 w-4 text-rose-600 flex-shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* 2. Search & Filter Bar */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Search by name or email..."
-            className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all shadow-sm"
+            placeholder="Search by receptionist name, email, or phone..."
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
-              setCurrentPage(1); // Reset to first page when searching
+              setCurrentPage(1);
             }}
+            className="w-full pl-10 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-colors"
           />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
-        <select
-          className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
-          value={activeFilter}
-          onChange={(e) => {
-            setActiveFilter(e.target.value);
-            setCurrentPage(1); // Reset to first page when filtering
-          }}
-        >
-          <option value="all">All Receptionists</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
+
+        <div className="flex items-center gap-1.5 shrink-0 overflow-x-auto pb-1 sm:pb-0">
+          {['all', 'active', 'inactive'].map((filter) => (
+            <button
+              key={filter}
+              onClick={() => {
+                setActiveFilter(filter);
+                setCurrentPage(1);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-colors ${
+                activeFilter === filter
+                  ? 'bg-blue-50 text-blue-700 border border-blue-200/70 shadow-2xs'
+                  : 'text-slate-600 hover:bg-slate-50 border border-transparent'
+              }`}
+            >
+              {filter === 'all' ? `All (${receptionists.length})` : filter}
+            </button>
+          ))}
+          <button
+            onClick={() => clinicId && fetchReceptionists(clinicId)}
+            className="p-2 text-slate-500 hover:text-blue-600 hover:bg-slate-50 rounded-xl border border-slate-200 transition-colors flex items-center justify-center shrink-0 ml-1"
+            title="Refresh receptionists"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
       </div>
 
-      {/* Receptionists Table */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      {/* 3. Table Container */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         {loading ? (
-          <div className="flex justify-center items-center py-12">
-            <FiRefreshCw  className="animate-spin h-8 w-8 text-indigo-600" />
-            <span className="ml-2">Loading receptionists...</span>
-          </div>
-        ) : error && receptionists.length === 0 ? (
-          <div className="p-8 text-center">
-            <FiAlertCircle className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-lg font-medium text-gray-900">Unable to load receptionists</h3>
-            <p className="mt-1 text-gray-500">{error}</p>
-            <button
-              onClick={() => fetchReceptionists(Id)}
-              className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none"
-            >
-              <FiRefreshCw className="mr-2 h-4 w-4" />
-              Retry
-            </button>
-          </div>
-        ) : receptionists.length === 0 ? (
-          <div className="p-8 text-center">
-            <FiUserPlus className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-lg font-medium text-gray-900">No receptionists found</h3>
-            <p className="mt-1 text-gray-500">Get started by adding a new receptionist.</p>
-            <button
-              onClick={openAddModal}
-              className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none"
-            >
-              <FiUserPlus className="mr-2 h-4 w-4" />
-              Add Receptionist
-            </button>
+          <div className="p-12 text-center text-slate-500 flex flex-col items-center justify-center gap-3">
+            <RefreshCw className="h-6 w-6 animate-spin text-blue-600" />
+            <span className="text-sm font-medium">Loading receptionists...</span>
           </div>
         ) : filteredReceptionists.length === 0 ? (
-          <div className="p-8 text-center">
-            <FiSearch className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-lg font-medium text-gray-900">No matching receptionists</h3>
-            <p className="mt-1 text-gray-500">Try adjusting your search or filter criteria.</p>
+          <div className="p-12 text-center text-slate-400 flex flex-col items-center justify-center">
+            <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 mb-3 border border-slate-100">
+              <Users className="w-6 h-6" />
+            </div>
+            <p className="text-sm font-semibold text-slate-700">No receptionists found</p>
+            <p className="text-xs text-slate-400 mt-1 max-w-sm">
+              {searchTerm ? 'Try adjusting your search query or filter.' : 'Click "Add New Receptionist" above to create your clinic front desk staff.'}
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-semibold">
+                  <th className="py-3 px-6">Receptionist</th>
+                  <th className="py-3 px-6">Contact Number</th>
+                  <th className="py-3 px-6">Account Status</th>
+                  <th className="py-3 px-6 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {paginatedReceptionists.map((receptionist) => (
-                  <tr key={receptionist._id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-medium">
-                          {receptionist.firstName?.charAt(0)}{receptionist.lastName?.charAt(0)}
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {receptionist.firstName} {receptionist.lastName}
+              <tbody className="divide-y divide-slate-100">
+                {paginatedReceptionists.map((rec) => {
+                  const fName = rec.firstName || rec.first_name || '';
+                  const lName = rec.lastName || rec.last_name || '';
+                  const fullName = `${fName} ${lName}`.trim() || 'Staff Member';
+                  const initials = (fName.charAt(0) + lName.charAt(0)).toUpperCase() || 'R';
+                  const isActive = (rec.status || 'active').toLowerCase() === 'active';
+
+                  return (
+                    <tr key={rec._id || rec.id} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="py-4 px-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0 border border-blue-200">
+                            {initials}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-slate-900 text-sm">{fullName}</div>
+                            <div className="text-slate-400 text-xs flex items-center gap-1 mt-0.5">
+                              <Mail className="w-3 h-3 text-slate-400" />
+                              <span>{rec.email || 'No email provided'}</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {receptionist.email || '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {receptionist.phone || '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {receptionist.status === 'active' ? (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 items-center gap-1">
-                          <MdOutlineVerified size={14} /> Active
+                      </td>
+
+                      <td className="py-4 px-6 text-slate-700 font-medium">
+                        <div className="flex items-center gap-1.5">
+                          <Phone className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{rec.phone || 'N/A'}</span>
+                        </div>
+                      </td>
+
+                      <td className="py-4 px-6">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold gap-1.5 ${
+                            isActive
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-slate-100 text-slate-700 border border-slate-200'
+                          }`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              isActive ? 'bg-emerald-500' : 'bg-slate-400'
+                            }`}
+                          />
+                          {isActive ? 'Active' : 'Inactive'}
                         </span>
-                      ) : (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800 items-center gap-1">
-                          <MdOutlinePending size={14} /> Inactive
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button
-                        onClick={() => openEditModal(receptionist)}
-                        className="text-indigo-600 hover:text-indigo-900 mr-4"
-                        disabled={deleteLoading}
-                      >
-                        <FiEdit2 size={18} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteClick(receptionist._id)}
-                        className="text-red-600 hover:text-red-900"
-                        disabled={deleteLoading}
-                      >
-                        {deleteLoading ? (
-                          <FiRefreshCw className="animate-spin h-4 w-4" />
-                        ) : (
-                          <FiTrash2 size={18} />
-                        )}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+
+                      <td className="py-4 px-6 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => openEditModal(rec)}
+                            className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Edit Receptionist"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClick(rec._id || rec.id)}
+                            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            title="Delete Receptionist"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/50 text-xs">
+            <span className="text-slate-500 font-medium">
+              Page {currentPage} of {totalPages} ({filteredReceptionists.length} receptionists)
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                disabled={currentPage === 1}
+                className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Pagination */}
-      {filteredReceptionists.length > 0 && (
-        <div className="flex flex-col md:flex-row justify-between items-center mt-6 gap-4">
-          <div className="text-sm text-gray-500">
-            Showing {Math.min((currentPage - 1) * itemsPerPage + 1, filteredReceptionists.length)}-
-            {Math.min(currentPage * itemsPerPage, filteredReceptionists.length)} of {filteredReceptionists.length} receptionists
-          </div>
-          <div className="flex gap-1">
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-              className="p-2 rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <FiChevronLeft size={18} />
-            </button>
-            {Array.from({ length: totalPages }).map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setCurrentPage(i + 1)}
-                className={`px-4 py-2 rounded-lg border ${
-                  currentPage === i + 1
-                    ? 'bg-indigo-600 text-white border-indigo-600'
-                    : 'border-gray-300 text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                {i + 1}
-              </button>
-            ))}
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-              disabled={currentPage === totalPages}
-              className="p-2 rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <FiChevronRight size={18} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Add/Edit Modal */}
+      {/* 4. Add / Edit Modal — Visibly follows Bed Management / Nurse Management */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center p-6 border-b">
-              <h3 className="text-xl font-semibold text-gray-800">
-                {currentReceptionist ? 'Edit Receptionist' : 'Add New Receptionist'}
-              </h3>
-              <button 
-                onClick={() => !submitLoading && setIsModalOpen(false)}
-                className={`text-gray-400 hover:text-gray-500 ${submitLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+        <div 
+          onClick={closeModal}
+          className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-xl overflow-hidden flex flex-col text-xs"
+          >
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70 shrink-0">
+              <div>
+                <span className="font-bold text-sm text-slate-900">
+                  {currentReceptionist ? 'Edit Receptionist' : 'Add New Receptionist'}
+                </span>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  {currentReceptionist
+                    ? 'Update profile details, contact number, or operational status'
+                    : 'Create front desk staff account with secure access credentials'}
+                </p>
+              </div>
+              <button
+                onClick={closeModal}
                 disabled={submitLoading}
+                className="p-1 text-slate-400 hover:text-slate-700 rounded-lg transition-colors disabled:opacity-50"
               >
-                <FiX size={24} />
+                <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="p-6">
-              {error && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-start gap-2">
-                  <FiAlertCircle className="flex-shrink-0 mt-0.5" />
-                  <span>{error}</span>
+
+            {/* Modal Form */}
+            <form onSubmit={handleSubmit} autoComplete="off" className="p-6 space-y-4 overflow-y-auto flex-1">
+              {modalError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl flex items-center gap-1.5 font-semibold text-xs">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                  <span>{modalError}</span>
                 </div>
               )}
-              {successMessage && (
-                <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg flex items-start gap-2">
-                  <FiCheckCircle className="flex-shrink-0 mt-0.5" />
-                  <span>{successMessage}</span>
+
+              {/* First & Last Name */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">
+                    First Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Sarah"
+                    value={formData.firstName}
+                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                    disabled={submitLoading}
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs sm:text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-colors"
+                  />
                 </div>
-              )}
-              <form onSubmit={handleSubmit}>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        First Name <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="firstName"
-                        required
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
-                        defaultValue={currentReceptionist?.firstName || ''}
-                        disabled={submitLoading}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Last Name <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="lastName"
-                        required
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
-                        defaultValue={currentReceptionist?.lastName || ''}
-                        disabled={submitLoading}
-                      />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email <span className="text-red-500">*</span>
-                    </label>
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">
+                    Last Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Jenkins"
+                    value={formData.lastName}
+                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                    disabled={submitLoading}
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs sm:text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Email Address */}
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">
+                  Email Address <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="receptionist@clinic.com"
+                  autoComplete="new-email"
+                  value={formData.email}
+                  readOnly={!!currentReceptionist}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  disabled={submitLoading}
+                  className={`w-full px-3.5 py-2 border rounded-xl text-xs sm:text-sm transition-colors ${
+                    currentReceptionist
+                      ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed'
+                      : 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600'
+                  }`}
+                />
+                {currentReceptionist && (
+                  <p className="text-[11px] text-slate-400 mt-1">Email address cannot be modified after creation.</p>
+                )}
+              </div>
+
+              {/* Phone Number */}
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">
+                  Phone Number (10 digits) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  maxLength={10}
+                  placeholder="e.g. 9876543210"
+                  value={formData.phone}
+                  onChange={(e) => {
+                    const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    setFormData({ ...formData, phone: digitsOnly });
+                  }}
+                  disabled={submitLoading}
+                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs sm:text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-colors"
+                />
+              </div>
+
+              {/* Password Section */}
+              {!currentReceptionist ? (
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">
+                    Password <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
                     <input
-                      type="email"
-                      name="email"
+                      type={showPassword ? 'text' : 'password'}
                       required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
-                      defaultValue={currentReceptionist?.email || ''}
-                      disabled={submitLoading || !!currentReceptionist}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Phone <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="tel"
-                      name="phone"
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
-                      defaultValue={currentReceptionist?.phone || ''}
+                      minLength={8}
+                      autoComplete="new-password"
+                      placeholder="At least 8 characters"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                       disabled={submitLoading}
+                      className="w-full pl-3.5 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs sm:text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-colors"
                     />
-                  </div>
-
-                  {/* Password fields */}
-                  {!currentReceptionist ? (
-                    <>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Password <span className="text-red-500">*</span>
-                        </label>
-                        <div className="relative">
-                          <input
-                            type={showPassword ? "text" : "password"}
-                            name="password"
-                            required
-                            minLength={8}
-                            className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
-                            placeholder="At least 8 characters"
-                            disabled={submitLoading}
-                          />
-                          <button
-                            type="button"
-                            className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-                            onClick={() => setShowPassword(!showPassword)}
-                            disabled={submitLoading}
-                          >
-                            {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Confirm Password <span className="text-red-500">*</span>
-                        </label>
-                        <div className="relative">
-                          <input
-                            type={showConfirmPassword ? "text" : "password"}
-                            name="confirmPassword"
-                            required
-                            minLength={8}
-                            className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
-                            placeholder="Confirm your password"
-                            disabled={submitLoading}
-                          />
-                          <button
-                            type="button"
-                            className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                            disabled={submitLoading}
-                          >
-                            {showConfirmPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
-                          </button>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        New Password (optional)
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showPassword ? "text" : "password"}
-                          name="newPassword"
-                          minLength={8}
-                          className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
-                          placeholder="Leave blank to keep current"
-                          disabled={submitLoading}
-                        />
-                        <button
-                          type="button"
-                          className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-                          onClick={() => setShowPassword(!showPassword)}
-                          disabled={submitLoading}
-                        >
-                          {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
-                        </button>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Minimum 8 characters required if changing password
-                      </p>
-                    </div>
-                  )}
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                    <select
-                      name="status"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
-                      defaultValue={currentReceptionist?.status || 'active'}
-                      disabled={submitLoading}
-                    >
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
-                  </div>
-
-                  <div className="flex justify-end gap-3 pt-4 border-t">
                     <button
                       type="button"
-                      onClick={() => setIsModalOpen(false)}
-                      className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => setShowPassword(!showPassword)}
                       disabled={submitLoading}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                     >
-                      Cancel
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
-                    <button
-                      type="submit"
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">Starts empty; no default password is assigned.</p>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">
+                    New Password <span className="text-slate-400 font-normal">(optional)</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      minLength={8}
+                      autoComplete="new-password"
+                      placeholder="Leave blank to retain current password"
+                      value={formData.newPassword}
+                      onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
                       disabled={submitLoading}
+                      className="w-full pl-3.5 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs sm:text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-colors"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      disabled={submitLoading}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                     >
-                      {submitLoading && (
-                        <FiRefreshCw className="animate-spin h-4 w-4" />
-                      )}
-                      {currentReceptionist ? 'Update' : 'Create'} Receptionist
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
+              )}
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden relative animate-in fade-in zoom-in duration-200">
-            <button 
-              onClick={() => setShowDeleteConfirm(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-full transition-colors z-10"
-            >
-              <FiX className="h-5 w-5" />
-            </button>
-            <div className="p-6 text-center">
-              <FiTrash2 className="mx-auto h-12 w-12 text-red-500 mb-4" />
-              <h3 className="text-xl font-bold text-gray-900">Delete Receptionist?</h3>
-              <p className="text-gray-500 my-2">This action is permanent and cannot be undone.</p>
-              <div className="flex justify-center gap-3 mt-6">
-                <button 
-                  onClick={() => setShowDeleteConfirm(false)} 
-                  className="px-4 py-2 border rounded-lg hover:bg-gray-50 font-medium text-gray-700"
+              {/* Account Status */}
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">Account Status</label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  disabled={submitLoading}
+                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-colors"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+
+              {/* Modal Footer Actions */}
+              <div className="px-6 py-4 -mx-6 -mb-6 bg-slate-50/50 border-t border-slate-100 flex items-center justify-end gap-2.5 shrink-0 mt-6">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  disabled={submitLoading}
+                  className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-semibold transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
-                <button 
-                  onClick={confirmDelete} 
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium flex items-center gap-2"
-                  disabled={deleteLoading}
+                <button
+                  type="submit"
+                  disabled={submitLoading}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
                 >
-                  {deleteLoading && <FiRefreshCw className="animate-spin h-4 w-4" />}
-                  Delete
+                  {submitLoading && <RefreshCw className="animate-spin h-3.5 w-3.5" />}
+                  <span>{currentReceptionist ? 'Update Receptionist' : 'Create Receptionist'}</span>
                 </button>
               </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div 
+          onClick={() => setShowDeleteConfirm(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-sm w-full p-6 border border-slate-200 shadow-xl text-center animate-in zoom-in-95 duration-150"
+          >
+            <div className="w-12 h-12 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 mx-auto mb-4">
+              <Trash2 className="h-6 w-6" />
+            </div>
+            <h3 className="text-base font-bold text-slate-900">Delete Receptionist?</h3>
+            <p className="text-xs text-slate-500 mt-1 mb-5">
+              This staff member will be removed from your clinic account. This action cannot be undone.
+            </p>
+            <div className="flex items-center justify-center gap-2.5">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleteLoading}
+                className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deleteLoading}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-sm"
+              >
+                {deleteLoading && <RefreshCw className="animate-spin h-3.5 w-3.5" />}
+                <span>Delete</span>
+              </button>
             </div>
           </div>
         </div>
       )}
     </div>
   );
-};
-
-export default ReceptionistManagement;
+}

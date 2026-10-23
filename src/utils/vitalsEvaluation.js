@@ -34,10 +34,20 @@ export function evaluateVitals(values = {}, patientContext = {}) {
   let hasAbnormal = false;
 
   // 1. Blood Pressure: systolic and diastolic in mmHg
-  const systolic = values.bp_systolic !== undefined && values.bp_systolic !== null && values.bp_systolic !== ''
+  let systolic = values.bp_systolic !== undefined && values.bp_systolic !== null && values.bp_systolic !== ''
     ? Number(values.bp_systolic) : null;
-  const diastolic = values.bp_diastolic !== undefined && values.bp_diastolic !== null && values.bp_diastolic !== ''
+  let diastolic = values.bp_diastolic !== undefined && values.bp_diastolic !== null && values.bp_diastolic !== ''
     ? Number(values.bp_diastolic) : null;
+
+  if (systolic === null && diastolic === null && values.bp && typeof values.bp === 'string') {
+    const parts = values.bp.split('/');
+    if (parts.length === 2) {
+      const s = Number(parts[0].trim());
+      const d = Number(parts[1].trim());
+      if (!isNaN(s) && s > 0) systolic = s;
+      if (!isNaN(d) && d > 0) diastolic = d;
+    }
+  }
 
   if (systolic !== null || diastolic !== null) {
     const bpStr = (systolic !== null && diastolic !== null)
@@ -437,3 +447,54 @@ export function evaluateVitals(values = {}, patientContext = {}) {
     has_abnormal: hasAbnormal
   };
 }
+
+/**
+ * Formats observation schedule frequency into a clear, unambiguous clinical label (e.g., "Every 4 hours (Q4H)").
+ * Dynamically supports any configured hourly frequency without hardcoding.
+ */
+export function formatScheduleFrequencyLabel(scheduleOrFreq) {
+  if (!scheduleOrFreq) return null;
+  const freq = typeof scheduleOrFreq === 'string' ? scheduleOrFreq : scheduleOrFreq.frequency;
+  if (!freq || freq === 'none') return 'Schedule not configured';
+
+  const hours = typeof scheduleOrFreq === 'object' && scheduleOrFreq.frequencyHours
+    ? Number(scheduleOrFreq.frequencyHours)
+    : parseInt(String(freq).replace(/[^0-9]/g, ''), 10) || null;
+
+  if (hours) {
+    return `Every ${hours} hour${hours === 1 ? '' : 's'} (Q${hours}H)`;
+  }
+
+  return String(freq).toUpperCase();
+}
+
+/**
+ * Resolves the staff member's name from a vital observation or clinical record.
+ * Returns only the staff member's name without raw IDs or secondary IDs.
+ * If the name cannot be resolved (or is a raw UUID/hash), safely returns "Unknown staff".
+ */
+export function resolveStaffName(item) {
+  if (!item) return 'Unknown staff';
+  const candidate = (
+    item.nurse_name ||
+    item.nurseName ||
+    item.recorded_by_name ||
+    item.recordedByName ||
+    item.staff_name ||
+    item.staffName ||
+    (typeof item.recorded_by === 'object' && item.recorded_by ? (item.recorded_by.name || item.recorded_by.fullName) : null) ||
+    ''
+  ).trim();
+
+  if (!candidate) return 'Unknown staff';
+
+  // Guard against raw UUIDs, MongoDB ObjectIds, or purely hexadecimal IDs being shown as names
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(candidate);
+  const isRawHex = /^[0-9a-f]{24}$/i.test(candidate);
+  if (isUuid || isRawHex) {
+    return 'Unknown staff';
+  }
+
+  return candidate;
+}
+

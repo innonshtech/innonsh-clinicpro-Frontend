@@ -16,7 +16,10 @@ import {
   ExternalLink,
   Pencil,
   Stethoscope,
-  Eye
+  Eye,
+  Layers,
+  FlaskConical,
+  BedDouble
 } from 'lucide-react';
 import { formatTitleCase } from '@/utils/nameFormatting';
 import { API_BASE_URL, getAuthHeaders } from '@/utils/api';
@@ -234,8 +237,14 @@ export default function ClinicDetailsModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[680px] max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+      <div
+        onClick={onClose}
+        className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-[680px] max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 cursor-default"
+        >
           {/* Modal Header - Fixed/Sticky */}
           <div className="flex-shrink-0 flex justify-between items-center px-6 py-4 bg-white border-b border-gray-200 z-10">
             <div className="flex items-center space-x-2.5">
@@ -414,6 +423,49 @@ export default function ClinicDetailsModal({
                 ) : (
                   <p className="text-sm text-gray-500 italic">Opening hours not specified</p>
                 )}
+              </div>
+            </div>
+
+            {/* MODULE CONFIGURATION */}
+            <div>
+              <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wider mb-2.5 flex items-center gap-2">
+                <Layers className="h-4 w-4 text-indigo-600" />
+                Enabled Modules
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white p-3.5 rounded-xl border border-gray-200 text-xs">
+                <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-200/60">
+                  <div className="flex items-center gap-2">
+                    <FlaskConical className="h-4 w-4 text-indigo-600" />
+                    <div>
+                      <span className="font-semibold text-gray-800 block">Lab Module</span>
+                      <span className="text-[11px] text-gray-500">Test orders &amp; reports</span>
+                    </div>
+                  </div>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                    (detailedClinic?.modules ? detailedClinic.modules.lab !== false : true)
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                      : 'bg-slate-200 text-slate-700 border border-slate-300'
+                  }`}>
+                    {(detailedClinic?.modules ? detailedClinic.modules.lab !== false : true) ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-200/60">
+                  <div className="flex items-center gap-2">
+                    <BedDouble className="h-4 w-4 text-indigo-600" />
+                    <div>
+                      <span className="font-semibold text-gray-800 block">{'IPD & Bed Management'}</span>
+                      <span className="text-[11px] text-gray-500">Inpatients, beds &amp; nurses</span>
+                    </div>
+                  </div>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                    (detailedClinic?.modules ? detailedClinic.modules.ipd === true : false)
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                      : 'bg-slate-200 text-slate-700 border border-slate-300'
+                  }`}>
+                    {(detailedClinic?.modules ? detailedClinic.modules.ipd === true : false) ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
               </div>
             </div>
 

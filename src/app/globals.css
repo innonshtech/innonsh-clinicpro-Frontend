@@ -37,10 +37,11 @@
 /* Component-specific typography */
 @layer components {
   button, .btn { @apply font-medium tracking-wide transition-all duration-200; }
-  table th { @apply font-semibold text-left text-sm tracking-wide text-gray-700 dark:text-gray-300; }
-  table td { @apply font-normal text-sm text-gray-900 dark:text-gray-100; }
-  label { @apply font-medium text-sm text-gray-700 dark:text-gray-300 mb-1 block; }
-  input::placeholder, textarea::placeholder { @apply font-normal text-gray-400 dark:text-gray-500; }
+  table th { @apply font-bold text-left text-xs tracking-wider text-slate-900; }
+  table thead th { @apply font-bold text-slate-900; }
+  table td { @apply font-normal text-sm text-slate-800; }
+  label { @apply font-medium text-sm text-gray-700 mb-1 block; }
+  input::placeholder, textarea::placeholder { @apply font-normal text-gray-400; }
 }
 
 /* 
